@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* Permission granted or rejected handled gracefully */ }
+    ) { /* Gracefully handle notification permission */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,9 +61,21 @@ class MainActivity : ComponentActivity() {
                 ZenithTunerScreen(
                     state = state,
                     onToggleDsp = { enabled -> service?.setDspEnabled(enabled) },
+                    onTabSelect = { tab -> service?.setTab(tab) },
+                    onPresetSelect = { preset -> service?.applyPreset(preset) },
                     onToggleAntiMud = { enabled -> service?.setAntiMudEnabled(enabled) },
                     onSubBassChange = { weight -> service?.setSubBassWeight(weight) },
-                    onVocalPresenceChange = { presence -> service?.setVocalPresence(presence) }
+                    onVocalPresenceChange = { presence -> service?.setVocalPresence(presence) },
+                    onCrossfeedChange = { amount -> service?.setCrossfeedAmount(amount) },
+                    onParametricChange = { id, enabled, freq, q, gainDb ->
+                        service?.updateParametricStage(id, enabled, freq, q, gainDb)
+                    },
+                    onPreampChange = { auto, manualDb ->
+                        service?.updatePreamp(auto, manualDb)
+                    },
+                    onMbcChange = { settings ->
+                        service?.updateMbcSettings(settings)
+                    }
                 )
             }
         }

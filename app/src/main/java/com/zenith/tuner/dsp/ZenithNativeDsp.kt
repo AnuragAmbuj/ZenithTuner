@@ -5,12 +5,13 @@ import kotlin.math.*
 
 /**
  * JNI bridge to panic-safe Rust DSP core (libzenith_dsp.so)
- * with transparent pure-Kotlin fallback.
+ * with transparent pure-Kotlin fallback for custom parametric tuning.
  */
 object ZenithNativeDsp {
 
     private const val TAG = "ZenithNativeDsp"
-    const val BUFFER_SIZE = 194 // 32 pre freqs + 32 pre gains + 32 post freqs + 32 post gains + 1 preamp + 1 maxBoost + 64 curve
+    const val BUFFER_SIZE = 194
+    const val PARAMS_BUFFER_SIZE = 42 // 8 stages * 5 params + 1 crossfeed + 1 preamp
     const val INDEX_PREAMP = 128
     const val INDEX_MAX_BOOST = 129
     const val INDEX_CURVE_START = 130
@@ -29,10 +30,6 @@ object ZenithNativeDsp {
         }
     }
 
-    /**
-     * Native JNI signature matching:
-     * Java_com_zenith_tuner_dsp_ZenithNativeDsp_computeAcousticCorrection
-     */
     external fun computeAcousticCorrection(
         sampleRate: Double,
         ancAntiMud: Boolean,
@@ -41,73 +38,79 @@ object ZenithNativeDsp {
         outputBuffer: FloatArray
     ): Int
 
+    external fun computeCustomTuning(
+        sampleRate: Double,
+        paramsArray: FloatArray,
+        outputBuffer: FloatArray
+    ): Int
+
     /**
-     * Computes the complete 64-band split, preamp headroom, and Bode plot spline.
-     * Uses Rust native binary if loaded, or transparent Kotlin fallback.
+     * Computes acoustic correction using full custom parametric stages, crossfeed, and preamp override.
      */
-    fun compute(
+    fun computeCustom(
         sampleRate: Double = 48000.0,
-        ancAntiMud: Boolean = true,
-        subBassWeight: Float = 1.0f,
-        vocalPresence: Float = 1.0f,
+        stages: List<ParametricStageConfig>,
+        crossfeed: Float = 0.0f,
+        manualPreampDb: Float? = null,
         outBuffer: FloatArray = FloatArray(BUFFER_SIZE)
     ): FloatArray {
         if (outBuffer.size < BUFFER_SIZE) {
             throw IllegalArgumentException("Buffer size must be at least $BUFFER_SIZE floats")
         }
 
+        // Pack parameters into flat array
+        val params = FloatArray(PARAMS_BUFFER_SIZE)
+        for (i in 0 until min(stages.size, 8)) {
+            val s = stages[i]
+            val offset = i * 5
+            params[offset] = if (s.enabled) 1.0f else 0.0f
+            params[offset + 1] = s.kind.id.toFloat()
+            params[offset + 2] = s.freq
+            params[offset + 3] = s.q
+            params[offset + 4] = s.gainDb
+        }
+        params[40] = crossfeed.coerceIn(0.0f, 1.0f)
+        params[41] = manualPreampDb ?: -99.0f
+
         if (isNativeLoaded) {
             try {
-                val status = computeAcousticCorrection(
-                    sampleRate,
-                    ancAntiMud,
-                    subBassWeight,
-                    vocalPresence,
-                    outBuffer
-                )
-                if (status == 0) {
-                    return outBuffer
-                }
-                Log.w(TAG, "Native compute returned error status: $status, falling back to Kotlin")
+                val status = computeCustomTuning(sampleRate, params, outBuffer)
+                if (status == 0) return outBuffer
+                Log.w(TAG, "Native computeCustom returned $status, falling back to Kotlin")
             } catch (e: Throwable) {
-                Log.e(TAG, "Error invoking native DSP", e)
+                Log.e(TAG, "Error invoking native custom DSP", e)
             }
         }
 
-        // Pure-Kotlin mirror fallback
-        computeKotlinFallback(sampleRate, ancAntiMud, subBassWeight, vocalPresence, outBuffer)
+        computeCustomKotlin(sampleRate, stages, crossfeed, manualPreampDb, outBuffer)
         return outBuffer
     }
 
     /**
-     * Pure-Kotlin exact implementation of Robert Bristow-Johnson Audio EQ Cookbook
-     * for running when the native library is not present.
+     * Pure-Kotlin mirror fallback for custom parametric tuning.
      */
-    private fun computeKotlinFallback(
+    private fun computeCustomKotlin(
         sampleRate: Double,
-        ancAntiMud: Boolean,
-        subBassWeight: Float,
-        vocalPresence: Float,
+        stages: List<ParametricStageConfig>,
+        crossfeed: Float,
+        manualPreampDb: Float?,
         out: FloatArray
     ) {
         val sr = sampleRate.coerceIn(8000.0, 384000.0)
-        val subScale = subBassWeight.coerceIn(0.0f, 2.0f).toDouble()
-        val vocScale = vocalPresence.coerceIn(0.0f, 2.0f).toDouble()
+        val biquads = stages.map { stage ->
+            if (!stage.enabled) {
+                BiquadCoeffs(1.0, 0.0, 0.0, 0.0, 0.0)
+            } else {
+                when (stage.kind) {
+                    FilterKind.PASS -> BiquadCoeffs(1.0, 0.0, 0.0, 0.0, 0.0)
+                    FilterKind.HIGH_PASS -> makeHpf(stage.freq.toDouble(), stage.q.toDouble(), sr)
+                    FilterKind.LOW_SHELF -> makeLowShelf(stage.freq.toDouble(), stage.q.toDouble(), stage.gainDb.toDouble(), sr)
+                    FilterKind.PEAKING -> makePeaking(stage.freq.toDouble(), stage.q.toDouble(), stage.gainDb.toDouble(), sr)
+                    FilterKind.HIGH_SHELF -> makeHighShelf(stage.freq.toDouble(), stage.q.toDouble(), stage.gainDb.toDouble(), sr)
+                }
+            }
+        }
 
-        // 8-stage target filters
-        val f1 = makeHpf(24.0, 0.7071, sr)
-        val f2 = makeLowShelf(55.0, 0.71, 3.6 * subScale, sr)
-        val midBassGain = if (ancAntiMud) -5.2 else -1.5
-        val f3 = makePeaking(145.0, 1.8, midBassGain, sr)
-        val f4 = makePeaking(320.0, 1.2, -2.4, sr)
-        val f5 = makePeaking(1650.0, 1.4, 2.8 * vocScale, sr)
-        val f6 = makePeaking(3100.0, 1.8, 3.2 * vocScale, sr)
-        val f7 = makePeaking(6600.0, 2.5, -3.8, sr)
-        val f8 = makeHighShelf(11500.0, 0.71, 2.5, sr)
-
-        val filters = arrayOf(f1, f2, f3, f4, f5, f6, f7, f8)
-
-        // 64 logarithmic frequencies from 20Hz to 20kHz
         val freqs = FloatArray(64)
         val curve = FloatArray(64)
         var maxBoost = 0.0
@@ -118,34 +121,44 @@ object ZenithNativeDsp {
             freqs[i] = f.toFloat()
 
             var totalDb = 0.0
-            for (filter in filters) {
+            for (filter in biquads) {
                 totalDb += evalDb(filter, f, sr)
             }
+
+            // Crossfeed effect modeling
+            if (crossfeed > 0.01f) {
+                if (f < 700.0) {
+                    totalDb += 0.75 * crossfeed * (1.0 - f / 700.0)
+                } else if (f > 6000.0) {
+                    totalDb += -0.6 * crossfeed * ((f - 6000.0) / 14000.0).coerceIn(0.0, 1.0)
+                }
+            }
+
             curve[i] = totalDb.toFloat()
             if (totalDb > maxBoost) maxBoost = totalDb
         }
 
-        // Additional dense peak scan
+        // Additional dense scan
         for (step in 0 until 128) {
             val exp = step.toDouble() / 127.0
             val testF = 20.0 * (20000.0 / 20.0).pow(exp)
             var totalDb = 0.0
-            for (filter in filters) {
+            for (filter in biquads) {
                 totalDb += evalDb(filter, testF, sr)
+            }
+            if (crossfeed > 0.01f) {
+                if (testF < 700.0) totalDb += 0.75 * crossfeed * (1.0 - testF / 700.0)
+                else if (testF > 6000.0) totalDb += -0.6 * crossfeed * ((testF - 6000.0) / 14000.0).coerceIn(0.0, 1.0)
             }
             if (totalDb > maxBoost) maxBoost = totalDb
         }
 
-        // Preamp Headroom at index 128
-        val preampDb = if (maxBoost > 0.0) -(maxBoost + 0.2).toFloat() else 0.0f
+        val preampDb = manualPreampDb ?: (if (maxBoost > 0.0) -(maxBoost + 0.2).toFloat() else 0.0f)
 
-        // Pre-EQ: Bands 0..31
         for (i in 0 until 32) {
             out[i] = freqs[i]
             out[32 + i] = curve[i]
         }
-
-        // Post-EQ: Bands 32..63
         for (i in 0 until 32) {
             out[64 + i] = freqs[32 + i]
             out[96 + i] = curve[32 + i]
@@ -153,7 +166,6 @@ object ZenithNativeDsp {
 
         out[INDEX_PREAMP] = preampDb
         out[INDEX_MAX_BOOST] = maxBoost.toFloat()
-
         for (i in 0 until 64) {
             out[INDEX_CURVE_START + i] = curve[i]
         }

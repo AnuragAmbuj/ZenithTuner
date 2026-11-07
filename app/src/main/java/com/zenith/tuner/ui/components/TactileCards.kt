@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,8 +21,48 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zenith.tuner.dsp.AcousticPreset
 import com.zenith.tuner.dsp.AcousticState
 import com.zenith.tuner.ui.theme.*
+
+/**
+ * Horizontal scrollable row of acoustic presets
+ */
+@Composable
+fun PresetPillsRow(
+    activePreset: AcousticPreset,
+    onPresetSelect: (AcousticPreset) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        AcousticPreset.values().forEach { preset ->
+            val isSelected = preset == activePreset
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        if (isSelected) ElectricCyan else ObsidianSurfaceElevated
+                    )
+                    .clickable { onPresetSelect(preset) }
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = preset.displayName,
+                    fontSize = 12.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) ObsidianBlack else TextSecondary
+                )
+            }
+        }
+    }
+}
 
 /**
  * Master DSP Toggle Card with active pulse indicator
@@ -73,7 +115,7 @@ fun MasterEngineCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = if (state.isDspEnabled)
-                        "Hardware DynamicsProcessing Active • Preamp: ${String.format("%.1f", state.preampHeadroomDb)}dB"
+                        "${state.activePreset.displayName} • Preamp: ${String.format("%.1f", state.preampHeadroomDb)}dB"
                     else "Acoustic correction bypassed",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (state.isDspEnabled) ElectricCyan else TextTertiary
@@ -290,60 +332,155 @@ fun VocalPresenceCard(
 }
 
 /**
- * 11mm Driver Transient Damper (MBC) Status Card
+ * Natural Stereophonic Crossfeed Card
  */
 @Composable
-fun TransientDamperCard(modifier: Modifier = Modifier) {
+fun CrossfeedCard(
+    amount: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
     GlassCard(modifier = modifier) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(DamperAmber.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Compress,
-                    contentDescription = null,
-                    tint = DamperAmber,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.SpatialAudio,
+                        contentDescription = null,
+                        tint = ElectricCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "11mm Transient Damper",
+                        text = "Binaural Crossfeed & Soundstage",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
+                }
+
+                Text(
+                    text = if (amount <= 0.01f) "Off" else String.format("%.0f%%", amount * 100f),
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = if (amount > 0.01f) ElectricCyan else TextTertiary,
+                    fontSize = 13.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Slider(
+                value = amount,
+                onValueChange = onValueChange,
+                valueRange = 0.0f..1.0f,
+                colors = SliderDefaults.colors(
+                    thumbColor = ElectricCyan,
+                    activeTrackColor = ElectricCyan,
+                    inactiveTrackColor = ObsidianBorder
+                )
+            )
+
+            Text(
+                text = "Simulates natural interaural time and acoustic head shadow, eliminating 'in-the-head' fatigue and widening spatial depth.",
+                style = MaterialTheme.typography.bodyMedium,
+                fontSize = 11.sp,
+                color = TextTertiary
+            )
+        }
+    }
+}
+
+/**
+ * Preamp Headroom & Auto-Clipping Guard Card
+ */
+@Composable
+fun PreampHeadroomCard(
+    autoEnabled: Boolean,
+    manualDb: Float,
+    calculatedDb: Float,
+    onAutoToggle: (Boolean) -> Unit,
+    onManualChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    GlassCard(modifier = modifier) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.VolumeDown,
+                        contentDescription = null,
+                        tint = DamperAmber,
+                        modifier = Modifier.size(20.dp)
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(DamperAmber.copy(alpha = 0.2f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
+                    Column {
                         Text(
-                            text = "3.5ms MBC",
-                            color = DamperAmber,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "Preamp Headroom",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (autoEnabled) "Auto-Calculated Zero-Clipping Guard" else "Manual Fixed Preamp",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DamperAmber
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(2.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Auto", style = MaterialTheme.typography.labelSmall)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Switch(
+                        checked = autoEnabled,
+                        onCheckedChange = onAutoToggle,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = ObsidianBlack,
+                            checkedTrackColor = DamperAmber,
+                            uncheckedThumbColor = TitaniumGray,
+                            uncheckedTrackColor = ObsidianBorder
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (!autoEnabled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Manual Gain", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        String.format("%+.1f dB", manualDb),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = DamperAmber
+                    )
+                }
+                Slider(
+                    value = manualDb,
+                    onValueChange = onManualChange,
+                    valueRange = -12.0f..3.0f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = DamperAmber,
+                        activeTrackColor = DamperAmber,
+                        inactiveTrackColor = ObsidianBorder
+                    )
+                )
+            } else {
                 Text(
-                    text = "Band 1 (70Hz–250Hz) dynamically clamps titanium diaphragm decay time to prevent bass overhang.",
+                    text = "Current applied attenuation: ${String.format("%.1f dB", calculatedDb)} (injected at index 128 of JNI buffer).",
                     style = MaterialTheme.typography.bodyMedium,
                     fontSize = 12.sp,
-                    lineHeight = 16.sp
+                    color = TextSecondary
                 )
             }
         }

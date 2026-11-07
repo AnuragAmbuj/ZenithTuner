@@ -13,15 +13,14 @@ import androidx.lifecycle.LifecycleService
 import com.zenith.tuner.MainActivity
 import com.zenith.tuner.R
 import com.zenith.tuner.ZenithApplication
-import com.zenith.tuner.dsp.AcousticState
-import com.zenith.tuner.dsp.DynamicsProcessingManager
+import com.zenith.tuner.dsp.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Android 12+ Foreground Service hosting the DynamicsProcessing engine.
- * Hooks into global audio session (0) and intercepted player sessions.
+ * Full customization options for presets, parametric tuning, and MBC dynamics.
  */
 class ZenithDspService : LifecycleService() {
 
@@ -69,7 +68,6 @@ class ZenithDspService : LifecycleService() {
         instance = this
         Log.i(TAG, "ZenithDspService created.")
 
-        // Hook into global session 0 (captures overall media output)
         dynamicsManager.attachSession(DynamicsProcessingManager.GLOBAL_AUDIO_SESSION_ID)
         updateState()
 
@@ -120,19 +118,56 @@ class ZenithDspService : LifecycleService() {
         updateNotification()
     }
 
+    fun setTab(tab: TunerTab) {
+        dynamicsManager.setTab(tab)
+        updateState()
+    }
+
+    fun applyPreset(preset: AcousticPreset) {
+        dynamicsManager.applyPreset(preset)
+        updateState()
+        updateNotification()
+    }
+
     fun setAntiMudEnabled(enabled: Boolean) {
-        dynamicsManager.updateParameters(ancAntiMudEnabled = enabled)
+        dynamicsManager.updateExpressParameters(ancAntiMudEnabled = enabled)
         updateState()
         updateNotification()
     }
 
     fun setSubBassWeight(weight: Float) {
-        dynamicsManager.updateParameters(subBass = weight)
+        dynamicsManager.updateExpressParameters(subBass = weight)
         updateState()
     }
 
     fun setVocalPresence(presence: Float) {
-        dynamicsManager.updateParameters(vocals = presence)
+        dynamicsManager.updateExpressParameters(vocals = presence)
+        updateState()
+    }
+
+    fun setCrossfeedAmount(amount: Float) {
+        dynamicsManager.updateExpressParameters(crossfeed = amount)
+        updateState()
+    }
+
+    fun updateParametricStage(
+        stageId: Int,
+        enabled: Boolean? = null,
+        freq: Float? = null,
+        q: Float? = null,
+        gainDb: Float? = null
+    ) {
+        dynamicsManager.updateParametricStage(stageId, enabled, freq, q, gainDb)
+        updateState()
+    }
+
+    fun updatePreamp(auto: Boolean, manualDb: Float) {
+        dynamicsManager.updatePreamp(auto, manualDb)
+        updateState()
+    }
+
+    fun updateMbcSettings(settings: MbcSettings) {
+        dynamicsManager.updateMbcSettings(settings)
         updateState()
     }
 
@@ -183,12 +218,12 @@ class ZenithDspService : LifecycleService() {
             )
         }
 
-        val dspStatus = if (state.isDspEnabled) "DSP ACTIVE" else "BYPASS"
-        val antiMudStatus = if (state.ancAntiMudEnabled) "50dB Anti-Mud ON" else "Anti-Mud OFF"
+        val dspStatus = if (state.isDspEnabled) "ACTIVE" else "BYPASS"
+        val presetName = state.activePreset.displayName
 
         return NotificationCompat.Builder(this, ZenithApplication.CHANNEL_ID)
-            .setContentTitle("boAt Nirvana Zenith: $dspStatus")
-            .setContentText("$antiMudStatus • Preamp: ${String.format("%.1f", state.preampHeadroomDb)}dB")
+            .setContentTitle("ZenithTuner: $presetName ($dspStatus)")
+            .setContentText("Preamp: ${String.format("%.1f", state.preampHeadroomDb)}dB • Sessions: ${state.activeSessionCount}")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .setContentIntent(openAppIntent)
@@ -199,7 +234,7 @@ class ZenithDspService : LifecycleService() {
             )
             .addAction(
                 0,
-                if (state.ancAntiMudEnabled) "Anti-Mud Off" else "Anti-Mud On",
+                if (state.ancAntiMudEnabled) "Anti-Mud On" else "Anti-Mud Off",
                 toggleAntiMudIntent
             )
             .setPriority(NotificationCompat.PRIORITY_LOW)
