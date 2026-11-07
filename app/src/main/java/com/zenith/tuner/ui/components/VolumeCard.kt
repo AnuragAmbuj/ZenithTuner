@@ -13,6 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ fun VolumeCard(
     modifier: Modifier = Modifier
 ) {
     var showAdvancedGain by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
     val volumePercent = (volumeRatio * 100).toInt()
     val isMuted = volumePercent == 0
 
@@ -71,7 +74,10 @@ fun VolumeCard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     FilledIconButton(
-                        onClick = onToggleMute,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onToggleMute()
+                        },
                         shape = CircleShape,
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = if (isMuted) {
@@ -188,7 +194,10 @@ fun VolumeCard(
                 }
 
                 TextButton(
-                    onClick = { showAdvancedGain = !showAdvancedGain },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        showAdvancedGain = !showAdvancedGain
+                    },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text(

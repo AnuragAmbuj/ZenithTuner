@@ -17,7 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +39,7 @@ fun PresetPillsRow(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val haptic = LocalHapticFeedback.current
 
     Row(
         modifier = modifier
@@ -48,7 +51,10 @@ fun PresetPillsRow(
             val isSelected = preset == activePreset
             FilterChip(
                 selected = isSelected,
-                onClick = { onPresetSelect(preset) },
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onPresetSelect(preset)
+                },
                 label = {
                     Text(
                         text = preset.displayName,
@@ -93,6 +99,7 @@ fun MasterEngineCard(
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
@@ -135,7 +142,7 @@ fun MasterEngineCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = if (state.isDspEnabled)
-                        "${state.activePreset.displayName} • Preamp: ${String.format("%.1f", state.preampHeadroomDb)}dB"
+                        "${state.activePreset.displayName} • Preamp: ${String.format("%.1f", state.preampHeadroomDb)}dB • Output: ${String.format("%+.1f", state.digitalOutputGainDb)}dB"
                     else "Acoustic correction bypassed",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (state.isDspEnabled) ElectricCyan else TextTertiary
@@ -144,7 +151,10 @@ fun MasterEngineCard(
 
             Switch(
                 checked = state.isDspEnabled,
-                onCheckedChange = onToggle,
+                onCheckedChange = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onToggle(it)
+                },
                 thumbContent = if (state.isDspEnabled) {
                     {
                         Icon(
@@ -175,6 +185,8 @@ fun AncAntiMudCard(
     onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+
     GlassCard(modifier = modifier) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -197,7 +209,7 @@ fun AncAntiMudCard(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = if (enabled) "-5.2dB Cut at 145Hz & HPF 24Hz Active" else "Driver Ringing Cut Bypassed",
+                            text = if (enabled) "-6.5dB at 145Hz & HPF 24Hz Active (Mud Blocked)" else "Bypassed (Stock 145Hz Resonant Bloat)",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (enabled) AntiMudGreen else TextTertiary
                         )
@@ -206,7 +218,10 @@ fun AncAntiMudCard(
 
                 Switch(
                     checked = enabled,
-                    onCheckedChange = onToggle,
+                    onCheckedChange = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onToggle(it)
+                    },
                     thumbContent = if (enabled) {
                         {
                             Icon(
@@ -228,7 +243,7 @@ fun AncAntiMudCard(
 
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = "Neutralizes the heavy 100Hz–200Hz pressure wave pumped by active ANC error mics into the 11mm diaphragms, preventing muddy transients.",
+                text = "Neutralizes the heavy 100Hz–200Hz pressure wave pumped by active ANC error mics into the 11mm diaphragms, eliminating muddy transients and clarifying vocals.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
                 fontSize = 12.sp,
@@ -247,7 +262,8 @@ fun SubBassWeightCard(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val gainDb = 3.6f * weight
+    val haptic = LocalHapticFeedback.current
+    val gainDb = 4.5f * weight
 
     GlassCard(modifier = modifier) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -283,7 +299,12 @@ fun SubBassWeightCard(
             Spacer(modifier = Modifier.height(4.dp))
             Slider(
                 value = weight,
-                onValueChange = onValueChange,
+                onValueChange = {
+                    if (Math.abs(it - 1.0f) < 0.05f && Math.abs(weight - 1.0f) >= 0.05f) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                    onValueChange(it)
+                },
                 valueRange = 0.0f..2.0f,
                 colors = SliderDefaults.colors(
                     thumbColor = ElectricCyan,
@@ -297,8 +318,8 @@ fun SubBassWeightCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Linear (0dB)", style = MaterialTheme.typography.labelSmall)
-                Text("Nominal (+3.6dB)", style = MaterialTheme.typography.labelSmall)
-                Text("Deep Slam (+7.2dB)", style = MaterialTheme.typography.labelSmall)
+                Text("Nominal (+4.5dB)", style = MaterialTheme.typography.labelSmall)
+                Text("Deep Slam (+9.0dB)", style = MaterialTheme.typography.labelSmall)
             }
         }
     }
@@ -313,8 +334,9 @@ fun VocalPresenceCard(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val gain1650 = 2.8f * presence
-    val gain3100 = 3.2f * presence
+    val haptic = LocalHapticFeedback.current
+    val gain1650 = 3.2f * presence
+    val gain3100 = 3.8f * presence
 
     GlassCard(modifier = modifier) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -350,7 +372,12 @@ fun VocalPresenceCard(
             Spacer(modifier = Modifier.height(4.dp))
             Slider(
                 value = presence,
-                onValueChange = onValueChange,
+                onValueChange = {
+                    if (Math.abs(it - 1.0f) < 0.05f && Math.abs(presence - 1.0f) >= 0.05f) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    }
+                    onValueChange(it)
+                },
                 valueRange = 0.0f..2.0f,
                 colors = SliderDefaults.colors(
                     thumbColor = ElectricAzure,
@@ -365,7 +392,7 @@ fun VocalPresenceCard(
             ) {
                 Text("Recessed (0dB)", style = MaterialTheme.typography.labelSmall)
                 Text("Forward (Nominal)", style = MaterialTheme.typography.labelSmall)
-                Text("Intimate (+6dB)", style = MaterialTheme.typography.labelSmall)
+                Text("Intimate (+7.0dB)", style = MaterialTheme.typography.labelSmall)
             }
         }
     }

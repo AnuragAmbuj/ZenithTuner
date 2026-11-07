@@ -4,6 +4,8 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
+import android.media.AudioPlaybackConfiguration
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -56,6 +58,51 @@ class ZenithDspService : LifecycleService() {
     private val binder = LocalBinder()
     private val dynamicsManager = DynamicsProcessingManager()
 
+    private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+
+    private val playbackCallback = object : AudioManager.AudioPlaybackCallback() {
+        override fun onPlaybackConfigChanged(configs: List<AudioPlaybackConfiguration>) {
+            var sessionCountChanged = false
+            for (config in configs) {
+                val sessionId = extractSessionId(config)
+                if (sessionId > 0) {
+                    if (dynamicsManager.attachSession(sessionId)) {
+                        sessionCountChanged = true
+                    }
+                }
+            }
+            if (sessionCountChanged) {
+                updateState()
+                updateNotification()
+            }
+        }
+    }
+
+    private fun extractSessionId(config: AudioPlaybackConfiguration): Int {
+        try {
+            val method = config.javaClass.getMethod("getSessionId")
+            val id = method.invoke(config) as? Int
+            if (id != null && id > 0) return id
+        } catch (_: Throwable) {}
+
+        try {
+            val field = config.javaClass.getDeclaredField("mSessionId")
+            field.isAccessible = true
+            val id = field.getInt(config)
+            if (id > 0) return id
+        } catch (_: Throwable) {}
+
+        try {
+            val str = config.toString()
+            val match = Regex("session:(\\d+)").find(str)
+            if (match != null) {
+                return match.groupValues[1].toInt()
+            }
+        } catch (_: Throwable) {}
+
+        return -1
+    }
+
     private val _stateFlow = MutableStateFlow(dynamicsManager.getCurrentState())
     val stateFlow: StateFlow<AcousticState> = _stateFlow.asStateFlow()
 
@@ -68,9 +115,30 @@ class ZenithDspService : LifecycleService() {
         instance = this
         Log.i(TAG, "ZenithDspService created.")
 
+        // 1. Attach global session
         dynamicsManager.attachSession(DynamicsProcessingManager.GLOBAL_AUDIO_SESSION_ID)
-        updateState()
 
+        // 2. Query already active media playback sessions (Spotify, YouTube, Poweramp, etc.)
+        try {
+            val activeConfigs = audioManager.activePlaybackConfigurations
+            for (config in activeConfigs) {
+                val sessionId = extractSessionId(config)
+                if (sessionId > 0) {
+                    dynamicsManager.attachSession(sessionId)
+                }
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Could not query active playback configurations", e)
+        }
+
+        // 3. Register live playback listener for incoming media streams
+        try {
+            audioManager.registerAudioPlaybackCallback(playbackCallback, null)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to register playback callback", e)
+        }
+
+        updateState()
         startForeground(NOTIFICATION_ID, buildNotification())
     }
 
@@ -258,6 +326,11 @@ class ZenithDspService : LifecycleService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            audioManager.unregisterAudioPlaybackCallback(playbackCallback)
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to unregister playback callback", e)
+        }
         dynamicsManager.releaseAll()
         instance = null
         Log.i(TAG, "ZenithDspService destroyed.")

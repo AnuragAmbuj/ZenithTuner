@@ -14,6 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -182,11 +184,15 @@ fun ZenithTunerScreen(
                 },
                 modifier = Modifier.clip(RoundedCornerShape(12.dp))
             ) {
+                val haptic = LocalHapticFeedback.current
                 TunerTab.values().forEach { tab ->
                     val isSelected = tab == state.currentTab
                     Tab(
                         selected = isSelected,
-                        onClick = { onTabSelect(tab) },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onTabSelect(tab)
+                        },
                         text = {
                             Text(
                                 text = tab.title,

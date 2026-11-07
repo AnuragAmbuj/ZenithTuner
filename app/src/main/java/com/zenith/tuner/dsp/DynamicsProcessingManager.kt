@@ -2,13 +2,17 @@ package com.zenith.tuner.dsp
 
 import android.media.audiofx.DynamicsProcessing
 import android.util.Log
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages Android 12 DynamicsProcessing instances across active audio sessions.
  * Implements:
+ * - High-priority AudioFlinger hook (Priority 1000)
+ * - Conflated background IPC dispatch for silky-smooth 120Hz slider controls
  * - 64-Band Split (32 Pre-EQ + 32 Post-EQ)
- * - Automatic Preamp Headroom or Manual Override
+ * - Automatic Preamp Headroom with digital output make-up gain
  * - 11mm Driver Transient Damper (4-band MBC with customizable 3.5ms attack)
  * - 0dBFS Peak Limiter
  * - Full Parametric Equalization & Acoustic Presets
@@ -18,6 +22,7 @@ class DynamicsProcessingManager {
     companion object {
         private const val TAG = "DynamicsProcMgr"
         const val GLOBAL_AUDIO_SESSION_ID = 0
+        const val PRIORITY_MASTER = 1000 // High priority over default OEM effect chains
         const val CHANNEL_COUNT = 2 // Stereo
         const val PRE_EQ_BANDS = 32
         const val POST_EQ_BANDS = 32
@@ -26,6 +31,10 @@ class DynamicsProcessingManager {
 
     private val activeEffects = ConcurrentHashMap<Int, DynamicsProcessing>()
     private val buffer = FloatArray(ZenithNativeDsp.BUFFER_SIZE)
+
+    // Background dispatcher for AudioFlinger IPC to keep Compose UI at buttery 120Hz
+    private val dspScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val hardwareUpdateChannel = Channel<Unit>(Channel.CONFLATED)
 
     @Volatile
     private var isEngineEnabled = true
@@ -55,7 +64,7 @@ class DynamicsProcessingManager {
     private var manualPreampDb = -3.8f
 
     @Volatile
-    private var digitalOutputGainDb = 0.0f
+    private var digitalOutputGainDb = 2.0f // +2.0dB nominal output compensation for clear, punchy volume
 
     @Volatile
     private var volumeRatio = 0.7f
@@ -67,6 +76,20 @@ class DynamicsProcessingManager {
 
     init {
         recomputeParameters()
+        startHardwareUpdateLoop()
+    }
+
+    private fun startHardwareUpdateLoop() {
+        dspScope.launch {
+            for (signal in hardwareUpdateChannel) {
+                applyToActiveEffectsInternal()
+                delay(20) // Throttle Binder IPC rate so AudioFlinger threads are never saturated
+            }
+        }
+    }
+
+    private fun requestHardwareUpdate() {
+        hardwareUpdateChannel.trySend(Unit)
     }
 
     @Synchronized
@@ -78,11 +101,11 @@ class DynamicsProcessingManager {
 
         try {
             val config = buildDynamicsProcessingConfig()
-            val dp = DynamicsProcessing(0, sessionId, config).apply {
+            val dp = DynamicsProcessing(PRIORITY_MASTER, sessionId, config).apply {
                 enabled = isEngineEnabled
             }
             activeEffects[sessionId] = dp
-            Log.i(TAG, "Attached DynamicsProcessing to session $sessionId (Enabled=$isEngineEnabled)")
+            Log.i(TAG, "Attached DynamicsProcessing to session $sessionId (Priority=$PRIORITY_MASTER, Enabled=$isEngineEnabled)")
             return true
         } catch (e: Throwable) {
             Log.e(TAG, "Failed to attach DynamicsProcessing to session $sessionId", e)
@@ -114,6 +137,7 @@ class DynamicsProcessingManager {
             }
         }
         activeEffects.clear()
+        dspScope.cancel()
     }
 
     @Synchronized
@@ -148,13 +172,13 @@ class DynamicsProcessingManager {
             AcousticPreset.HARMAN_IN_EAR -> {
                 this.stages = AcousticState.defaultStages().toMutableList().apply {
                     this[0] = this[0].copy(freq = 20f, q = 0.7071f)
-                    this[1] = this[1].copy(freq = 70f, q = 0.71f, gainDb = 5.5f) // Harman sub-bass shelf
-                    this[2] = this[2].copy(gainDb = -4.0f)                       // Moderate 145Hz cut
+                    this[1] = this[1].copy(freq = 70f, q = 0.71f, gainDb = 6.5f) // Harman sub-bass shelf
+                    this[2] = this[2].copy(gainDb = -4.5f)                       // 145Hz cut
                     this[3] = this[3].copy(gainDb = -1.5f)
-                    this[4] = this[4].copy(freq = 1750f, q = 1.3f, gainDb = 4.2f) // Harman pinna slope
-                    this[5] = this[5].copy(freq = 2900f, q = 1.7f, gainDb = 5.8f) // Harman pinna peak
-                    this[6] = this[6].copy(freq = 6600f, q = 2.2f, gainDb = -2.5f)
-                    this[7] = this[7].copy(freq = 11000f, q = 0.71f, gainDb = 1.5f)
+                    this[4] = this[4].copy(freq = 1750f, q = 1.3f, gainDb = 4.8f) // Harman pinna slope
+                    this[5] = this[5].copy(freq = 2900f, q = 1.7f, gainDb = 6.5f) // Harman pinna peak
+                    this[6] = this[6].copy(freq = 6600f, q = 2.2f, gainDb = -3.0f)
+                    this[7] = this[7].copy(freq = 11000f, q = 0.71f, gainDb = 2.5f)
                 }
                 this.subBassWeight = 1.4f
                 this.vocalPresence = 1.5f
@@ -162,22 +186,22 @@ class DynamicsProcessingManager {
             AcousticPreset.VOCAL_INTIMACY -> {
                 this.stages = AcousticState.defaultStages().toMutableList().apply {
                     this[0] = this[0].copy(freq = 30f, q = 0.7071f)
-                    this[1] = this[1].copy(gainDb = 1.0f)                          // Leaner sub-bass
-                    this[2] = this[2].copy(gainDb = -6.5f)                         // Deep mid-bass cut
-                    this[3] = this[3].copy(gainDb = -3.0f)
-                    this[4] = this[4].copy(freq = 1600f, q = 1.3f, gainDb = 4.5f) // Forward vocals
-                    this[5] = this[5].copy(freq = 3200f, q = 1.5f, gainDb = 4.8f)
-                    this[6] = this[6].copy(gainDb = -3.5f)
-                    this[7] = this[7].copy(gainDb = 3.5f)
+                    this[1] = this[1].copy(gainDb = 0.5f)                          // Leaner bass
+                    this[2] = this[2].copy(gainDb = -7.0f)                         // Deep mid-bass cut
+                    this[3] = this[3].copy(gainDb = -3.5f)
+                    this[4] = this[4].copy(freq = 1600f, q = 1.3f, gainDb = 5.5f) // Forward vocals
+                    this[5] = this[5].copy(freq = 3200f, q = 1.5f, gainDb = 6.0f)
+                    this[6] = this[6].copy(gainDb = -4.0f)
+                    this[7] = this[7].copy(gainDb = 4.0f)
                 }
-                this.subBassWeight = 0.5f
-                this.vocalPresence = 1.6f
+                this.subBassWeight = 0.3f
+                this.vocalPresence = 1.8f
             }
             AcousticPreset.BASSHEAD_SLAM -> {
                 this.stages = AcousticState.defaultStages().toMutableList().apply {
                     this[0] = this[0].copy(freq = 20f)
-                    this[1] = this[1].copy(freq = 50f, q = 0.85f, gainDb = 7.5f)  // Extreme sub-bass punch
-                    this[2] = this[2].copy(gainDb = -6.0f)                         // Aggressive anti-mud notch
+                    this[1] = this[1].copy(freq = 50f, q = 0.85f, gainDb = 9.0f)  // Extreme sub-bass punch
+                    this[2] = this[2].copy(gainDb = -6.5f)                         // Aggressive anti-mud notch
                     this[3] = this[3].copy(gainDb = -2.0f)
                     this[4] = this[4].copy(gainDb = 2.0f)
                     this[5] = this[5].copy(gainDb = 2.2f)
@@ -189,15 +213,15 @@ class DynamicsProcessingManager {
             }
             AcousticPreset.TREBLE_SPARKLE -> {
                 this.stages = AcousticState.defaultStages().toMutableList().apply {
-                    this[1] = this[1].copy(gainDb = 2.5f)
-                    this[2] = this[2].copy(gainDb = -4.5f)
-                    this[3] = this[3].copy(gainDb = -1.8f)
-                    this[4] = this[4].copy(gainDb = 3.0f)
-                    this[5] = this[5].copy(gainDb = 3.5f)
-                    this[6] = this[6].copy(gainDb = -2.8f)
-                    this[7] = this[7].copy(freq = 12000f, q = 0.71f, gainDb = 5.0f) // Airy soundstage
+                    this[1] = this[1].copy(gainDb = 2.0f)
+                    this[2] = this[2].copy(gainDb = -5.0f)
+                    this[3] = this[3].copy(gainDb = -2.0f)
+                    this[4] = this[4].copy(gainDb = 3.2f)
+                    this[5] = this[5].copy(gainDb = 4.0f)
+                    this[6] = this[6].copy(gainDb = -2.5f)
+                    this[7] = this[7].copy(freq = 12000f, q = 0.71f, gainDb = 6.0f) // Airy soundstage
                 }
-                this.crossfeedAmount = 0.35f // Expanded acoustic stage
+                this.crossfeedAmount = 0.35f
             }
             AcousticPreset.FLAT_STUDIO -> {
                 this.stages = AcousticState.defaultStages().toMutableList().map { it.copy(gainDb = 0f) }.toMutableList()
@@ -211,7 +235,7 @@ class DynamicsProcessingManager {
         }
 
         recomputeParameters()
-        applyToActiveEffects()
+        requestHardwareUpdate()
         return getCurrentState()
     }
 
@@ -227,19 +251,29 @@ class DynamicsProcessingManager {
         this.vocalPresence = vocals
         this.crossfeedAmount = crossfeed
 
-        // Sync with underlying stages
-        val subGain = 3.6f * subBass.coerceIn(0.0f, 2.0f)
-        val midBassGain = if (ancAntiMudEnabled) -5.2f else -1.5f
-        val vocal1650Gain = 2.8f * vocals.coerceIn(0.0f, 2.0f)
-        val vocal3100Gain = 3.2f * vocals.coerceIn(0.0f, 2.0f)
+        // Dynamic acoustic targets engineered for boAt Nirvana Zenith:
+        // Sub-Bass: 0dB to +9.0dB deep punch (nominal 4.5dB)
+        val subGain = 4.5f * subBass.coerceIn(0.0f, 2.0f)
 
+        // 50dB ANC Anti-Mud: -6.5dB surgical notch at 145Hz when active to stop 11mm diaphragm bloat, or 0dB when bypassed
+        val midBassGain = if (ancAntiMudEnabled) -6.5f else 0.0f
+
+        // Lower-mid boxiness cut at 320Hz: active when Anti-Mud is on
+        val boxinessGain = if (ancAntiMudEnabled) -3.0f else 0.0f
+
+        // Vocal presence pinna ear-gain: recessed (0dB) to intimate (+7.6dB)
+        val vocal1650Gain = 3.2f * vocals.coerceIn(0.0f, 2.0f)
+        val vocal3100Gain = 3.8f * vocals.coerceIn(0.0f, 2.0f)
+
+        stages[0] = stages[0].copy(enabled = ancAntiMudEnabled) // HPF 24Hz rumble strip
         stages[1] = stages[1].copy(gainDb = subGain)
         stages[2] = stages[2].copy(gainDb = midBassGain, enabled = ancAntiMudEnabled)
+        stages[3] = stages[3].copy(gainDb = boxinessGain, enabled = ancAntiMudEnabled)
         stages[4] = stages[4].copy(gainDb = vocal1650Gain)
         stages[5] = stages[5].copy(gainDb = vocal3100Gain)
 
         recomputeParameters()
-        applyToActiveEffects()
+        requestHardwareUpdate()
         return getCurrentState()
     }
 
@@ -253,16 +287,16 @@ class DynamicsProcessingManager {
     ): AcousticState {
         val index = stages.indexOfFirst { it.id == stageId }
         if (index != -1) {
-            val curr = stages[index]
-            stages[index] = curr.copy(
-                enabled = enabled ?: curr.enabled,
-                freq = freq ?: curr.freq,
-                q = q ?: curr.q,
-                gainDb = gainDb ?: curr.gainDb
+            val current = stages[index]
+            stages[index] = current.copy(
+                enabled = enabled ?: current.enabled,
+                freq = freq ?: current.freq,
+                q = q ?: current.q,
+                gainDb = gainDb ?: current.gainDb
             )
             this.activePreset = AcousticPreset.CUSTOM
             recomputeParameters()
-            applyToActiveEffects()
+            requestHardwareUpdate()
         }
         return getCurrentState()
     }
@@ -272,14 +306,14 @@ class DynamicsProcessingManager {
         this.autoPreampEnabled = auto
         this.manualPreampDb = manualDb
         recomputeParameters()
-        applyToActiveEffects()
+        requestHardwareUpdate()
         return getCurrentState()
     }
 
     @Synchronized
     fun updateDigitalOutputGain(gainDb: Float): AcousticState {
         this.digitalOutputGainDb = gainDb.coerceIn(-18.0f, 6.0f)
-        applyToActiveEffects()
+        requestHardwareUpdate()
         return getCurrentState()
     }
 
@@ -292,7 +326,6 @@ class DynamicsProcessingManager {
     @Synchronized
     fun updateMbcSettings(settings: MbcSettings): AcousticState {
         this.mbcSettings = settings
-        // Update hardware MBC across all sessions
         applyMbcToActiveEffects()
         return getCurrentState()
     }
@@ -341,7 +374,7 @@ class DynamicsProcessingManager {
         )
     }
 
-    private fun applyToActiveEffects() {
+    private fun applyToActiveEffectsInternal() {
         val effectiveGain = buffer[ZenithNativeDsp.INDEX_PREAMP] + digitalOutputGainDb
 
         activeEffects.values.forEach { dp ->
@@ -512,7 +545,7 @@ class DynamicsProcessingManager {
         )
         builder.setMbcAllChannelsTo(mbc)
 
-        // Output Limiter
+        // Output Limiter (0dBFS Brickwall Peak Guard)
         val limiter = DynamicsProcessing.Limiter(
             true,
             true,
