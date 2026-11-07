@@ -39,14 +39,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* Gracefully handle notification permission */ }
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* Gracefully handle notification and bluetooth permissions */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        checkNotificationPermission()
+        checkPermissions()
         startAndBindService()
 
         setContent {
@@ -81,15 +81,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkNotificationPermission() {
+    private fun checkPermissions() {
+        val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+        }
+        if (permissions.isNotEmpty()) {
+            requestPermissionLauncher.launch(permissions.toTypedArray())
         }
     }
 

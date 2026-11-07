@@ -487,15 +487,21 @@ fun PreampHeadroomCard(
     }
 }
 
+import androidx.compose.ui.platform.LocalContext
+import com.zenith.tuner.bluetooth.DeviceManager
+
 /**
- * Firmware Neutralization Guide Checklist Card
+ * Firmware Neutralization Guide & Companion App Bridge Card
  */
 @Composable
 fun FirmwareNeutralizationCard(modifier: Modifier = Modifier) {
-    var isExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var isExpanded by remember { mutableStateOf(true) }
     var step1Done by remember { mutableStateOf(true) }
     var step2Done by remember { mutableStateOf(true) }
     var step3Done by remember { mutableStateOf(true) }
+
+    val deviceInfo = remember { DeviceManager.getConnectedDeviceInfo(context) }
 
     GlassCard(modifier = modifier) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -510,20 +516,24 @@ fun FirmwareNeutralizationCard(modifier: Modifier = Modifier) {
                     Icon(
                         imageVector = Icons.Default.Headphones,
                         contentDescription = null,
-                        tint = TitaniumLight,
-                        modifier = Modifier.size(20.dp)
+                        tint = if (deviceInfo.isConnected) ElectricCyan else TitaniumLight,
+                        modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Earbud NVRAM & Firmware Settings",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         Text(
-                            text = "Earbud NVRAM Neutralization",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "Step 1: Clean onboard DSP state",
+                            text = if (deviceInfo.isZenith) "● boAt Nirvana Zenith Connected"
+                            else if (deviceInfo.isConnected) "● ${deviceInfo.deviceName}"
+                            else "Step 1: Neutralize Onboard NVRAM State",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TitaniumGray
+                            color = if (deviceInfo.isZenith) AntiMudGreen else TitaniumGray
                         )
                     }
                 }
@@ -538,23 +548,72 @@ fun FirmwareNeutralizationCard(modifier: Modifier = Modifier) {
             AnimatedVisibility(visible = isExpanded) {
                 Column(modifier = Modifier.padding(top = 12.dp)) {
                     Divider(color = ObsidianBorder, thickness = 1.dp)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Why Onboard Firmware Settings Matter:\n" +
+                                "boAt's onboard chip saves its internal DSP state in non-volatile flash (NVRAM). If Adaptive EQ or Dolby Spatial are enabled in firmware, the earbuds will dynamically distort frequencies behind our back. Neutralizing these 3 settings once puts the hardware into a transparent linear state.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        color = TextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Action buttons: Open boAt Hearables & Bluetooth Settings
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { DeviceManager.launchBoatHearables(context) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ElectricCyan,
+                                contentColor = ObsidianBlack
+                            ),
+                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 10.dp)
+                        ) {
+                            Icon(Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Open boAt App", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { DeviceManager.openBluetoothSettings(context) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = TitaniumLight
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, ObsidianBorder),
+                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 10.dp)
+                        ) {
+                            Icon(Icons.Default.SettingsBluetooth, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("BT Settings", fontSize = 11.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     ChecklistItem(
                         title = "1. Disable Dolby Audio / Spatial Sound",
-                        subtitle = "Prevents phase cancellation & artificial reverb",
+                        subtitle = "Prevents synthetic room phase smear and echo delays",
                         checked = step1Done,
                         onCheckedChange = { step1Done = it }
                     )
                     ChecklistItem(
                         title = "2. Disable Adaptive EQ",
-                        subtitle = "Prevents firmware from shifting curves dynamically",
+                        subtitle = "Prevents earbud firmware from dynamically shifting curves",
                         checked = step2Done,
                         onCheckedChange = { step2Done = it }
                     )
                     ChecklistItem(
                         title = "3. Set Sound Profile to Balanced / Natural",
-                        subtitle = "Earbuds store this linear state permanently in NVRAM",
+                        subtitle = "Earbuds permanently store this flat baseline in hardware NVRAM",
                         checked = step3Done,
                         onCheckedChange = { step3Done = it }
                     )
