@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">ZenithTuner</string>
+    <string name="dsp_notification_title">Zenith Acoustic Engine Active</string>
+    <string name="dsp_notification_subtitle">boAt Nirvana Zenith • 50dB Anti-Mud Active</string>
+    <string name="action_toggle_dsp">Toggle DSP</string>
+    <string name="action_toggle_anti_mud">Toggle Anti-Mud</string>
+</resources>
