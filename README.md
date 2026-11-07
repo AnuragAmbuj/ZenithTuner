@@ -10,8 +10,6 @@
   <img src="https://img.shields.io/badge/Target-boAt%20Nirvana%20Zenith-black.svg" alt="boAt Nirvana Zenith" />
 </p>
 
----
-
 ## The Screenshots
 
 <div align="center">
@@ -41,8 +39,6 @@
   </table>
 </div>
 
----
-
 ## Why I Built This
 
 I bought the **boAt Nirvana Zenith (Mystique Black)** because on paper the hardware looked genuinely promising for the price:
@@ -66,8 +62,6 @@ The out-of-the-box sound was a muffled, bloated mess:
 - **Play Store EQ Apps**: Most either drop audio sessions constantly, add noticeable latency, introduce audible digital clipping, or consume massive battery running dirty background polling loops.
 
 I wanted pure, reference-grade acoustic response with surgical precision, zero latency, and real driver control. So I built **ZenithTuner**.
-
----
 
 ## How ZenithTuner Solves It
 
@@ -114,8 +108,6 @@ ZenithTuner operates directly inside the Android 12+ audio subsystem via a dedic
 └────────────────────────────────────────────────────────┘
 ```
 
----
-
 ## The 4 Pillars of the Engineering Fix
 
 ### 1. The 8-Stage Panic-Safe Rust DSP Core (`rust-dsp`)
@@ -154,8 +146,6 @@ The boAt Nirvana Zenith uses 6 microphones (2 Feedforward, 2 Feedback, 2 Talk EN
   * **Adaptive 6-Mic AI**: Automatically calibrates filter depth to live ambient sound pressure.
 * **Zero Battery Waste**: The microphone sensing loop unbinds instantly when the app is placed in the background.
 
----
-
 ## Before vs. After: The Acoustic Blueprint
 
 | Frequency Band | Stock boAt Tuning | ZenithTuner Fix | What You Actually Hear |
@@ -168,51 +158,12 @@ The boAt Nirvana Zenith uses 6 microphones (2 Feedforward, 2 Feedback, 2 Talk EN
 | **Treble (6.6kHz)** | **+5dB harsh sizzle spike**| **-3.8dB Precision Notch** | Metallic cymbals and harsh sibilance ('S' sounds) smoothed out |
 | **Air (11.5kHz)** | Rolled off, narrow staging | **+3.2dB High-Shelf Boost** | Soundstage widens; reverb trails and sparkle come alive |
 
----
-
 ## The App UI & Experience
 
 * **120Hz Zero-Recomposition Bode Plot**: Built using Compose's `Modifier.drawWithCache`. You can drag your finger across the frequency response curve to inspect exact frequency and decibel gain in real-time at 120Hz without triggering Compose recomposition passes.
 * **Full Material Design 3 (Light & Dark)**: Native M3 tonal palettes with dynamic top-bar theme toggling (`Dark`, `Light`, `System`) and contrast-safe status/navigation bar insets.
 * **Binaural Spatial Crossfeed**: Natural interaural time and frequency delay simulation (0%–100%) that eliminates the in-the-head listening fatigue typical of closed-back in-ear monitors.
 * **Media Volume & Preamp Card**: Hardware volume rocker integration with smooth digital gain compensation.
-
----
-
-## How to Build & Install
-
-### Prerequisites
-- Android Studio Ladybug / Meerkat or Android SDK command-line tools
-- Android NDK (r25c or newer)
-- Rust toolchain (`rustup target add aarch64-linux-android`)
-- `cargo-ndk` (`cargo install cargo-ndk`)
-- Connected Android 12+ device with USB debugging enabled
-
-### 1. Compile the Rust DSP Core for ARM64
-```bash
-cd rust-dsp
-cargo ndk -t arm64-v8a -o ../app/src/main/jniLibs build --release
-cd ..
-```
-*(Or simply run `./build-rust.sh` which executes tests and compiles the target library)*
-
-### 2. Run the Rust DSP Unit Tests
-```bash
-cd rust-dsp
-cargo test
-```
-All 10 unit tests verify biquad formula math, Nyquist stability, custom parametric filter clamping, preamp headroom calculations, and JNI buffer alignments.
-
-### 3. Build & Install the Android App
-```bash
-./gradlew installDebug
-```
-Or via the Antigravity CLI:
-```bash
-agy run "Assemble and install release APK on connected Android 12 device"
-```
-
----
 
 ## Recommended Earbud Setup
 
@@ -223,8 +174,6 @@ Before firing up ZenithTuner for the first time, neutralize the earbud's local N
 4. Close boAt Hearables, open **ZenithTuner**, and engage the **Obsidian Acoustic Engine**.
 
 The difference in vocal clarity, bass speed, and overall sound quality is immediate.
-
----
 
 ## License
 
