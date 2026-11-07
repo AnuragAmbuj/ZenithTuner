@@ -113,7 +113,7 @@ fun ParametricStageCard(
 
             AnimatedVisibility(visible = isExpanded) {
                 Column(modifier = Modifier.padding(top = 10.dp)) {
-                    Divider(color = ObsidianBorder, thickness = 1.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(

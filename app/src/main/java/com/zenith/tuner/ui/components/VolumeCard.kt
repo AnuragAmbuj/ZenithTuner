@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeMute
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,10 +45,10 @@ fun VolumeCard(
     val isMuted = volumePercent == 0
 
     val volumeIcon = when {
-        isMuted -> Icons.Default.VolumeOff
-        volumeRatio < 0.35f -> Icons.Default.VolumeMute
-        volumeRatio < 0.70f -> Icons.Default.VolumeDown
-        else -> Icons.Default.VolumeUp
+        isMuted -> Icons.AutoMirrored.Filled.VolumeOff
+        volumeRatio < 0.35f -> Icons.AutoMirrored.Filled.VolumeMute
+        volumeRatio < 0.70f -> Icons.AutoMirrored.Filled.VolumeDown
+        else -> Icons.AutoMirrored.Filled.VolumeUp
     }
 
     Card(

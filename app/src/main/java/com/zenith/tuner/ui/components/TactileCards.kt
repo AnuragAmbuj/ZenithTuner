@@ -10,6 +10,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Launch
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -481,7 +483,7 @@ fun PreampHeadroomCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.VolumeDown,
+                        imageVector = Icons.AutoMirrored.Filled.VolumeDown,
                         contentDescription = null,
                         tint = DamperAmber,
                         modifier = Modifier.size(20.dp)
@@ -621,7 +623,7 @@ fun FirmwareNeutralizationCard(modifier: Modifier = Modifier) {
 
             AnimatedVisibility(visible = isExpanded) {
                 Column(modifier = Modifier.padding(top = 12.dp)) {
-                    Divider(color = ObsidianBorder, thickness = 1.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
@@ -650,7 +652,7 @@ fun FirmwareNeutralizationCard(modifier: Modifier = Modifier) {
                             ),
                             contentPadding = PaddingValues(vertical = 8.dp, horizontal = 10.dp)
                         ) {
-                            Icon(Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Icon(Icons.AutoMirrored.Filled.Launch, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Open boAt App", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
