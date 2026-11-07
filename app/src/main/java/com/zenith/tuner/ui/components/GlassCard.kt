@@ -1,23 +1,22 @@
 package com.zenith.tuner.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.zenith.tuner.ui.theme.ObsidianBorder
-import com.zenith.tuner.ui.theme.ObsidianSurface
 
+/**
+ * Material 3 Card with Obsidian tonal styling and optional active highlight border.
+ */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
@@ -25,43 +24,27 @@ fun GlassCard(
     borderGlow: Boolean = false,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val borderBrush = if (borderGlow) {
-        Brush.linearGradient(
-            colors = listOf(
-                Color(0xFF00E5FF).copy(alpha = 0.45f),
-                Color(0xFF2979FF).copy(alpha = 0.20f),
-                ObsidianBorder
-            )
-        )
+    val borderColor = if (borderGlow) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
     } else {
-        Brush.linearGradient(
-            colors = listOf(
-                Color(0xFF33333F),
-                ObsidianBorder,
-                Color(0xFF1E1E24)
-            )
-        )
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     }
 
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(cornerRadius)),
+    Card(
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(cornerRadius),
-        color = ObsidianSurface,
-        border = BorderStroke(1.dp, borderBrush),
-        tonalElevation = 2.dp
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (borderGlow) 4.dp else 1.dp
+        ),
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Box(
             modifier = Modifier
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF181820).copy(alpha = 0.70f),
-                            Color(0xFF0F0F14).copy(alpha = 0.85f)
-                        )
-                    )
-                )
+                .fillMaxWidth()
                 .padding(16.dp)
         ) {
             content()

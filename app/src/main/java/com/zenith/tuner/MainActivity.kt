@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -15,6 +16,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
+import com.zenith.tuner.audio.VolumeManager
 import com.zenith.tuner.dsp.AcousticState
 import com.zenith.tuner.service.ZenithDspService
 import com.zenith.tuner.ui.ZenithTunerScreen
@@ -24,6 +26,7 @@ class MainActivity : ComponentActivity() {
 
     private var dspService: ZenithDspService? by mutableStateOf(null)
     private var isBound by mutableStateOf(false)
+    private lateinit var volumeManager: VolumeManager
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -44,6 +47,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Ensure hardware volume rocker always directs to media stream
+        volumeControlStream = AudioManager.STREAM_MUSIC
+
+        volumeManager = VolumeManager(this)
+        volumeManager.startListening()
+
         enableEdgeToEdge()
 
         checkPermissions()
@@ -57,9 +66,22 @@ class MainActivity : ComponentActivity() {
                 } else {
                     remember { mutableStateOf(AcousticState()) }
                 }
+                val volumeRatio by volumeManager.volumeLevel.collectAsState()
 
                 ZenithTunerScreen(
                     state = state,
+                    volumeRatio = volumeRatio,
+                    digitalOutputGainDb = state.digitalOutputGainDb,
+                    onVolumeChange = { ratio ->
+                        volumeManager.setVolumeRatio(ratio)
+                        service?.setVolumeRatio(ratio)
+                    },
+                    onToggleMute = {
+                        volumeManager.toggleMute()
+                    },
+                    onDigitalGainChange = { gainDb ->
+                        service?.setDigitalOutputGain(gainDb)
+                    },
                     onToggleDsp = { enabled -> service?.setDspEnabled(enabled) },
                     onTabSelect = { tab -> service?.setTab(tab) },
                     onPresetSelect = { preset -> service?.applyPreset(preset) },
@@ -114,6 +136,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        volumeManager.stopListening()
         if (isBound) {
             unbindService(serviceConnection)
             isBound = false

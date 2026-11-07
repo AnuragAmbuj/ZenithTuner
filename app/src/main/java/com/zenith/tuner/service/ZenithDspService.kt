@@ -166,6 +166,16 @@ class ZenithDspService : LifecycleService() {
         updateState()
     }
 
+    fun setDigitalOutputGain(gainDb: Float) {
+        dynamicsManager.updateDigitalOutputGain(gainDb)
+        updateState()
+    }
+
+    fun setVolumeRatio(ratio: Float) {
+        dynamicsManager.updateVolumeRatio(ratio)
+        updateState()
+    }
+
     fun updateMbcSettings(settings: MbcSettings) {
         dynamicsManager.updateMbcSettings(settings)
         updateState()

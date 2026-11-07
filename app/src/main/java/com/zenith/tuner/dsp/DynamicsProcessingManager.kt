@@ -55,6 +55,12 @@ class DynamicsProcessingManager {
     private var manualPreampDb = -3.8f
 
     @Volatile
+    private var digitalOutputGainDb = 0.0f
+
+    @Volatile
+    private var volumeRatio = 0.7f
+
+    @Volatile
     private var mbcSettings = MbcSettings()
 
     private var stages: MutableList<ParametricStageConfig> = AcousticState.defaultStages().toMutableList()
@@ -271,6 +277,19 @@ class DynamicsProcessingManager {
     }
 
     @Synchronized
+    fun updateDigitalOutputGain(gainDb: Float): AcousticState {
+        this.digitalOutputGainDb = gainDb.coerceIn(-18.0f, 6.0f)
+        applyToActiveEffects()
+        return getCurrentState()
+    }
+
+    @Synchronized
+    fun updateVolumeRatio(ratio: Float): AcousticState {
+        this.volumeRatio = ratio.coerceIn(0f, 1f)
+        return getCurrentState()
+    }
+
+    @Synchronized
     fun updateMbcSettings(settings: MbcSettings): AcousticState {
         this.mbcSettings = settings
         // Update hardware MBC across all sessions
@@ -297,6 +316,8 @@ class DynamicsProcessingManager {
             manualPreampDb = manualPreampDb,
             preampHeadroomDb = buffer[ZenithNativeDsp.INDEX_PREAMP],
             maxBoostDb = buffer[ZenithNativeDsp.INDEX_MAX_BOOST],
+            volumeRatio = volumeRatio,
+            digitalOutputGainDb = digitalOutputGainDb,
             mbcSettings = mbcSettings,
             stages = stages.toList(),
             activeSessionCount = activeEffects.size.coerceAtLeast(1),
@@ -321,11 +342,11 @@ class DynamicsProcessingManager {
     }
 
     private fun applyToActiveEffects() {
-        val preampDb = buffer[ZenithNativeDsp.INDEX_PREAMP]
+        val effectiveGain = buffer[ZenithNativeDsp.INDEX_PREAMP] + digitalOutputGainDb
 
         activeEffects.values.forEach { dp ->
             try {
-                dp.setInputGainAllChannelsTo(preampDb)
+                dp.setInputGainAllChannelsTo(effectiveGain)
                 for (b in 0 until PRE_EQ_BANDS) {
                     val f = buffer[b]
                     val g = buffer[32 + b]
@@ -380,7 +401,7 @@ class DynamicsProcessingManager {
     }
 
     private fun buildDynamicsProcessingConfig(): DynamicsProcessing.Config {
-        val preampDb = buffer[ZenithNativeDsp.INDEX_PREAMP]
+        val effectiveGain = buffer[ZenithNativeDsp.INDEX_PREAMP] + digitalOutputGainDb
 
         val builder = DynamicsProcessing.Config.Builder(
             DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
@@ -395,7 +416,7 @@ class DynamicsProcessingManager {
         )
 
         builder.setPreferredFrameDuration(10.0f)
-        builder.setInputGainAllChannelsTo(preampDb)
+        builder.setInputGainAllChannelsTo(effectiveGain)
 
         // Pre-EQ
         val preEq = DynamicsProcessing.Eq(true, true, PRE_EQ_BANDS)

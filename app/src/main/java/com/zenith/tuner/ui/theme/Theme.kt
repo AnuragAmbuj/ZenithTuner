@@ -9,19 +9,42 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = ElectricCyan,
-    onPrimary = ObsidianBlack,
-    secondary = TitaniumGray,
-    onSecondary = ObsidianBlack,
-    tertiary = DamperAmber,
-    background = ObsidianBlack,
-    onBackground = TextPrimary,
-    surface = ObsidianSurface,
-    onSurface = TextPrimary,
-    surfaceVariant = ObsidianSurfaceElevated,
-    onSurfaceVariant = TextSecondary,
-    outline = ObsidianBorder
+/**
+ * Material Design 3 Dark Color Scheme for ZenithTuner.
+ * Tailored for the boAt Nirvana Zenith (Mystique Black & Electric Cyan theme).
+ */
+val ZenithDarkColorScheme = darkColorScheme(
+    primary = M3Primary,
+    onPrimary = M3OnPrimary,
+    primaryContainer = M3PrimaryContainer,
+    onPrimaryContainer = M3OnPrimaryContainer,
+    inversePrimary = M3Primary,
+
+    secondary = M3Secondary,
+    onSecondary = M3OnSecondary,
+    secondaryContainer = M3SecondaryContainer,
+    onSecondaryContainer = M3OnSecondaryContainer,
+
+    tertiary = M3Tertiary,
+    onTertiary = M3OnTertiary,
+    tertiaryContainer = M3TertiaryContainer,
+    onTertiaryContainer = M3OnTertiaryContainer,
+
+    background = M3Background,
+    onBackground = M3OnBackground,
+    surface = M3Surface,
+    onSurface = M3OnSurface,
+    surfaceVariant = M3SurfaceVariant,
+    onSurfaceVariant = M3OnSurfaceVariant,
+
+    surfaceContainerLowest = M3SurfaceContainerLowest,
+    surfaceContainerLow = M3SurfaceContainerLow,
+    surfaceContainer = M3SurfaceContainer,
+    surfaceContainerHigh = M3SurfaceContainerHigh,
+    surfaceContainerHighest = M3SurfaceContainerHighest,
+
+    outline = M3Outline,
+    outlineVariant = M3OutlineVariant
 )
 
 @Composable
@@ -30,8 +53,8 @@ fun ZenithTunerTheme(content: @Composable () -> Unit) {
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = ObsidianBlack.toArgb()
-            window.navigationBarColor = ObsidianBlack.toArgb()
+            window.statusBarColor = M3Background.toArgb()
+            window.navigationBarColor = M3Background.toArgb()
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = false
                 isAppearanceLightNavigationBars = false
@@ -40,7 +63,7 @@ fun ZenithTunerTheme(content: @Composable () -> Unit) {
     }
 
     MaterialTheme(
-        colorScheme = DarkColorScheme,
+        colorScheme = ZenithDarkColorScheme,
         typography = Typography,
         content = content
     )

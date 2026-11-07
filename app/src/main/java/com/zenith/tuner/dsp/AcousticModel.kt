@@ -83,11 +83,13 @@ data class AcousticState(
     val vocalPresence: Float = 1.0f,        // 0.0 to 2.0 (1.0 = nominal +2.8/+3.2dB)
     val crossfeedAmount: Float = 0.0f,      // 0.0 (off) to 1.0 (natural spatial crossfeed)
 
-    // Preamp Headroom
+    // Preamp Headroom & Volume
     val autoPreampEnabled: Boolean = true,
     val manualPreampDb: Float = -3.8f,
     val preampHeadroomDb: Float = -3.8f,
     val maxBoostDb: Float = 3.6f,
+    val volumeRatio: Float = 0.7f,            // 0.0 to 1.0 (System Media Volume)
+    val digitalOutputGainDb: Float = 0.0f,    // -12.0dB to +6.0dB output boost/cut
 
     // MBC & Dynamics Settings
     val mbcSettings: MbcSettings = MbcSettings(),

@@ -28,7 +28,7 @@ import com.zenith.tuner.dsp.AcousticState
 import com.zenith.tuner.ui.theme.*
 
 /**
- * Horizontal scrollable row of acoustic presets
+ * Horizontal scrollable row of acoustic presets using Material 3 FilterChips
  */
 @Composable
 fun PresetPillsRow(
@@ -46,22 +46,40 @@ fun PresetPillsRow(
     ) {
         AcousticPreset.values().forEach { preset ->
             val isSelected = preset == activePreset
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        if (isSelected) ElectricCyan else ObsidianSurfaceElevated
+            FilterChip(
+                selected = isSelected,
+                onClick = { onPresetSelect(preset) },
+                label = {
+                    Text(
+                        text = preset.displayName,
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     )
-                    .clickable { onPresetSelect(preset) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = preset.displayName,
-                    fontSize = 12.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) ObsidianBlack else TextSecondary
-                )
-            }
+                },
+                leadingIcon = if (isSelected) {
+                    {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                } else null,
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = isSelected,
+                    borderColor = MaterialTheme.colorScheme.outlineVariant,
+                    selectedBorderColor = MaterialTheme.colorScheme.primary
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
         }
     }
 }
@@ -127,11 +145,21 @@ fun MasterEngineCard(
             Switch(
                 checked = state.isDspEnabled,
                 onCheckedChange = onToggle,
+                thumbContent = if (state.isDspEnabled) {
+                    {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(SwitchDefaults.IconSize),
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                } else null,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = ObsidianBlack,
-                    checkedTrackColor = ElectricCyan,
-                    uncheckedThumbColor = TitaniumGray,
-                    uncheckedTrackColor = ObsidianBorder
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                 )
             )
         }
@@ -179,11 +207,21 @@ fun AncAntiMudCard(
                 Switch(
                     checked = enabled,
                     onCheckedChange = onToggle,
+                    thumbContent = if (enabled) {
+                        {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(SwitchDefaults.IconSize),
+                                tint = ObsidianBlack
+                            )
+                        }
+                    } else null,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = ObsidianBlack,
-                        checkedTrackColor = AntiMudGreen,
-                        uncheckedThumbColor = TitaniumGray,
-                        uncheckedTrackColor = ObsidianBorder
+                        checkedThumbColor = AntiMudGreen,
+                        checkedTrackColor = AntiMudGreen.copy(alpha = 0.35f),
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                     )
                 )
             }
@@ -442,11 +480,21 @@ fun PreampHeadroomCard(
                     Switch(
                         checked = autoEnabled,
                         onCheckedChange = onAutoToggle,
+                        thumbContent = if (autoEnabled) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize),
+                                    tint = ObsidianBlack
+                                )
+                            }
+                        } else null,
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = ObsidianBlack,
-                            checkedTrackColor = DamperAmber,
-                            uncheckedThumbColor = TitaniumGray,
-                            uncheckedTrackColor = ObsidianBorder
+                            checkedThumbColor = DamperAmber,
+                            checkedTrackColor = DamperAmber.copy(alpha = 0.35f),
+                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                         )
                     )
                 }

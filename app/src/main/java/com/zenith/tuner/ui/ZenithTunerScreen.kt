@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,9 +22,15 @@ import com.zenith.tuner.dsp.*
 import com.zenith.tuner.ui.components.*
 import com.zenith.tuner.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZenithTunerScreen(
     state: AcousticState,
+    volumeRatio: Float,
+    digitalOutputGainDb: Float,
+    onVolumeChange: (Float) -> Unit,
+    onToggleMute: () -> Unit,
+    onDigitalGainChange: (Float) -> Unit,
     onToggleDsp: (Boolean) -> Unit,
     onTabSelect: (TunerTab) -> Unit,
     onPresetSelect: (AcousticPreset) -> Unit,
@@ -40,53 +47,88 @@ fun ZenithTunerScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = ObsidianBlack
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "ZenithTuner",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = (-0.5).sp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (state.isDspEnabled) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHighest
+                                }
+                            ) {
+                                Text(
+                                    text = if (state.isDspEnabled) "DSP ACTIVE" else "BYPASS",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (state.isDspEnabled) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
+                        Text(
+                            text = "boAt Nirvana Zenith • Precision Acoustic Suite",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                actions = {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.padding(end = 12.dp)
+                    ) {
+                        Text(
+                            text = if (state.isNativeLoaded) "RUST ARM64" else "KOTLIN DSP",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (state.isNativeLoaded) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.tertiary
+                            }
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                )
+            )
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "ZenithTuner",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = (-1).sp
-                    )
-                    Text(
-                        text = "boAt Nirvana Zenith • Precision Acoustic Suite",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TitaniumGray
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(ObsidianSurfaceElevated)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = if (state.isNativeLoaded) "RUST ARM64-v8a" else "KOTLIN DSP",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (state.isNativeLoaded) ElectricCyan else DamperAmber
-                    )
-                }
-            }
-
-            // 120Hz Bode Plot Card (Always visible across all tabs for live feedback!)
+            // 120Hz Bode Plot Card (Always visible across all tabs for real-time acoustic feedback)
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 cornerRadius = 20.dp,
@@ -103,12 +145,13 @@ fun ZenithTunerScreen(
                             style = MaterialTheme.typography.labelSmall,
                             letterSpacing = 1.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TitaniumLight
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "${state.activePreset.displayName} • 120Hz",
                             style = MaterialTheme.typography.labelSmall,
-                            color = ElectricCyan
+                            color = MaterialTheme.colorScheme.primary,
+                            fontFamily = FontFamily.Monospace
                         )
                     }
 
@@ -122,19 +165,58 @@ fun ZenithTunerScreen(
                 }
             }
 
-            // Tab Selector Bar
-            TabSelectorBar(
-                selectedTab = state.currentTab,
-                onTabSelect = onTabSelect
-            )
+            // Material 3 Primary Tab Row
+            PrimaryTabRow(
+                selectedTabIndex = state.currentTab.ordinal,
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.primary,
+                indicator = {
+                    TabRowDefaults.PrimaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(state.currentTab.ordinal),
+                        color = MaterialTheme.colorScheme.primary,
+                        height = 3.dp
+                    )
+                },
+                divider = {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                },
+                modifier = Modifier.clip(RoundedCornerShape(12.dp))
+            ) {
+                TunerTab.values().forEach { tab ->
+                    val isSelected = tab == state.currentTab
+                    Tab(
+                        selected = isSelected,
+                        onClick = { onTabSelect(tab) },
+                        text = {
+                            Text(
+                                text = tab.title,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        selectedContentColor = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
             // Content per selected tab
             when (state.currentTab) {
                 TunerTab.EXPRESS -> {
-                    // Preset Quick Switch Pills
+                    // Quick Preset Chips
                     PresetPillsRow(
                         activePreset = state.activePreset,
                         onPresetSelect = onPresetSelect
+                    )
+
+                    // Material 3 Media Volume & Digital Output Compensation Card
+                    VolumeCard(
+                        volumeRatio = volumeRatio,
+                        digitalOutputGainDb = digitalOutputGainDb,
+                        preampHeadroomDb = state.preampHeadroomDb,
+                        onVolumeChange = onVolumeChange,
+                        onToggleMute = onToggleMute,
+                        onDigitalGainChange = onDigitalGainChange
                     )
 
                     // Master Engine Switch
@@ -190,12 +272,13 @@ fun ZenithTunerScreen(
                             text = "8-STAGE RBJ PARAMETRIC BIQUADS",
                             style = MaterialTheme.typography.labelSmall,
                             letterSpacing = 1.sp,
-                            color = TitaniumLight
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "f64 Precision",
                             style = MaterialTheme.typography.labelSmall,
-                            color = ElectricCyan
+                            color = MaterialTheme.colorScheme.primary,
+                            fontFamily = FontFamily.Monospace
                         )
                     }
 
@@ -211,6 +294,16 @@ fun ZenithTunerScreen(
                 }
 
                 TunerTab.DYNAMICS -> {
+                    // Volume & Output Headroom Card
+                    VolumeCard(
+                        volumeRatio = volumeRatio,
+                        digitalOutputGainDb = digitalOutputGainDb,
+                        preampHeadroomDb = state.preampHeadroomDb,
+                        onVolumeChange = onVolumeChange,
+                        onToggleMute = onToggleMute,
+                        onDigitalGainChange = onDigitalGainChange
+                    )
+
                     // MBC Studio
                     MbcDynamicsStudioCard(
                         settings = state.mbcSettings,
@@ -229,7 +322,7 @@ fun ZenithTunerScreen(
                         text = "ACOUSTIC TARGET VAULT",
                         style = MaterialTheme.typography.labelSmall,
                         letterSpacing = 1.sp,
-                        color = TitaniumLight
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     AcousticPreset.values().forEach { preset ->
@@ -258,45 +351,6 @@ fun ZenithTunerScreen(
 }
 
 /**
- * Segmented Obsidian Tab Bar
- */
-@Composable
-private fun TabSelectorBar(
-    selectedTab: TunerTab,
-    onTabSelect: (TunerTab) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(ObsidianSurface)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        TunerTab.values().forEach { tab ->
-            val isSelected = tab == selectedTab
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(if (isSelected) ObsidianSurfaceElevated else androidx.compose.ui.graphics.Color.Transparent)
-                    .clickable { onTabSelect(tab) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = tab.title,
-                    fontSize = 12.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) ElectricCyan else TextSecondary
-                )
-            }
-        }
-    }
-}
-
-/**
  * Card for selecting and exploring acoustic presets in the Vault
  */
 @Composable
@@ -305,14 +359,27 @@ private fun PresetVaultCard(
     isActive: Boolean,
     onSelect: () -> Unit
 ) {
-    GlassCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onSelect() },
-        borderGlow = isActive
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isActive) 3.dp else 1.dp
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -322,19 +389,18 @@ private fun PresetVaultCard(
                         text = preset.displayName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (isActive) ElectricCyan else TextPrimary
+                        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )
                     if (isActive) {
                         Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(ElectricCyan.copy(alpha = 0.2f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
                                 text = "ACTIVE",
-                                color = ElectricCyan,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -346,7 +412,7 @@ private fun PresetVaultCard(
                     text = preset.subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     fontSize = 12.sp,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -354,8 +420,8 @@ private fun PresetVaultCard(
                 selected = isActive,
                 onClick = onSelect,
                 colors = RadioButtonDefaults.colors(
-                    selectedColor = ElectricCyan,
-                    unselectedColor = TitaniumMuted
+                    selectedColor = MaterialTheme.colorScheme.primary,
+                    unselectedColor = MaterialTheme.colorScheme.outline
                 )
             )
         }
