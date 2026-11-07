@@ -21,6 +21,11 @@ cd "$SAVED" >/dev/null
 APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
+# Prefer JDK 17 for AGP compatibility
+if [ -d "/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home" ]; then
+    export JAVA_HOME="/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home"
+fi
+
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
     if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
@@ -35,8 +40,11 @@ fi
 # Locate gradle if wrapper jar is absent
 GRADLE_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
 if [ ! -f "$GRADLE_JAR" ]; then
-    # Try using system / cached gradle
-    CACHED_GRADLE=$(find "$HOME/.gradle/wrapper/dists" -name "gradle" -type f 2>/dev/null | head -n 1)
+    # Prefer Gradle 8.x (compatible with AGP 8.x)
+    CACHED_GRADLE=$(find "$HOME/.gradle/wrapper/dists" -path "*/gradle-8*/bin/gradle" -type f 2>/dev/null | head -n 1)
+    if [ -z "$CACHED_GRADLE" ]; then
+        CACHED_GRADLE=$(find "$HOME/.gradle/wrapper/dists" -name "gradle" -type f 2>/dev/null | head -n 1)
+    fi
     if [ -n "$CACHED_GRADLE" ] && [ -x "$CACHED_GRADLE" ]; then
         exec "$CACHED_GRADLE" "$@"
     elif command -v gradle >/dev/null 2>&1; then

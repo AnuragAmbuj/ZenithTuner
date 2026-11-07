@@ -72,7 +72,7 @@ class DynamicsProcessingManager {
 
         try {
             val config = buildDynamicsProcessingConfig()
-            val dp = DynamicsProcessing(sessionId, config).apply {
+            val dp = DynamicsProcessing(0, sessionId, config).apply {
                 enabled = isEngineEnabled
             }
             activeEffects[sessionId] = dp
@@ -383,7 +383,7 @@ class DynamicsProcessingManager {
         val preampDb = buffer[ZenithNativeDsp.INDEX_PREAMP]
 
         val builder = DynamicsProcessing.Config.Builder(
-            DynamicsProcessing.CONFIG_VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+            DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
             CHANNEL_COUNT,
             true,
             PRE_EQ_BANDS,
