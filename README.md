@@ -39,7 +39,7 @@
   </table>
 </div>
 
-## Why I Built This
+### Why I Built This
 
 I bought the **boAt Nirvana Zenith (Mystique Black)** because on paper the hardware looked genuinely promising for the price:
 - **Dual 11mm titanium-coated dynamic drivers**
@@ -47,7 +47,7 @@ I bought the **boAt Nirvana Zenith (Mystique Black)** because on paper the hardw
 - **A 6-microphone array** (Feedforward, Feedback, and Talk ENC with AI-ENx)
 - **Bluetooth 5.3 with AAC/SBC and multipoint pairing**
 
-### The Disappointment
+#### The Disappointment
 The second I paired them and put on my reference tracks, my excitement evaporated. 
 
 The out-of-the-box sound was a muffled, bloated mess:
@@ -63,7 +63,7 @@ The out-of-the-box sound was a muffled, bloated mess:
 
 I wanted pure, reference-grade acoustic response with surgical precision, zero latency, and real driver control. So I built **ZenithTuner**.
 
-## How ZenithTuner Solves It
+### How ZenithTuner Solves It
 
 ZenithTuner operates directly inside the Android 12+ audio subsystem via a dedicated Foreground Service hooking into global audio sessions, powered by a compiled native **Rust `f64` DSP core** and Android's hardware-accelerated **`DynamicsProcessing`** engine.
 
@@ -108,9 +108,9 @@ ZenithTuner operates directly inside the Android 12+ audio subsystem via a dedic
 └────────────────────────────────────────────────────────┘
 ```
 
-## The 4 Pillars of the Engineering Fix
+### The 4 Pillars of the Engineering Fix
 
-### 1. The 8-Stage Panic-Safe Rust DSP Core (`rust-dsp`)
+#### 1. The 8-Stage Panic-Safe Rust DSP Core (`rust-dsp`)
 At the heart of the engine is `libzenith_dsp.so`, written in Rust and compiled for `arm64-v8a`. It calculates exact Robert Bristow-Johnson (RBJ) biquad transfer functions in 64-bit floating point precision (`f64`), with mathematical clamping that prevents filter blowups near the Nyquist frequency ($f_s / 2$).
 
 The target curve surgically reconstructs the frequency response:
@@ -122,7 +122,7 @@ The target curve surgically reconstructs the frequency response:
 * **Peaking De-Sizzle Notch (6600Hz, -3.8dB)**: Cuts the metallic AAC compression sizzle from cymbals and hi-hats.
 * **High-Shelf Filter (11500Hz, +3.2dB)**: Opens up top-octave air, instrument separation, and soundstage width.
 
-### 2. Zero-Clipping Preamp Headroom Engine
+#### 2. Zero-Clipping Preamp Headroom Engine
 Boosting equalizer bands blindly is why most Android EQ apps sound terrible: they cause digital clipping on peaks. 
 
 ZenithTuner's Rust core continuously evaluates the composite response curve across all frequencies, calculates the exact maximum positive boost ($G_{\text{max}}$), and injects a negative preamp gain into the JNI buffer:
@@ -131,12 +131,12 @@ $$\text{Preamp Headroom (dB)} = -\max(0, G_{\text{max}})$$
 
 This mathematical headroom guarantee ensures that even at maximum volume, inter-sample peaks never clip.
 
-### 3. The 11mm Diaphragm Transient Damper (MBC)
+#### 3. The 11mm Diaphragm Transient Damper (MBC)
 To stop the 11mm titanium diaphragm from ringing during fast bass passages while ANC is active, ZenithTuner programs Android's 4-band hardware **Multi-Band Compressor**:
 * **Band 1 (70Hz–250Hz)** is configured with an aggressive **3.5ms attack time**, a **50ms release time**, and a **2.8:1 to 3.5:1 compression ratio**.
 * When a sudden bass drum hits, the compressor catches the mechanical overshoot in 3.5 milliseconds, acting as a dynamic shock-absorber for the titanium cone before it can ring.
 
-### 4. 6-Mic Hybrid ANC Decoupling & Live Room Sensing
+#### 4. 6-Mic Hybrid ANC Decoupling & Live Room Sensing
 The boAt Nirvana Zenith uses 6 microphones (2 Feedforward, 2 Feedback, 2 Talk ENC). When the app is open:
 * [`AmbientNoiseMonitor.kt`](app/src/main/java/com/zenith/tuner/anc/AmbientNoiseMonitor.kt) runs a lightweight 8Hz RMS sound pressure level (SPL) monitor using exponential smoothing ($\alpha = 0.25$).
 * It dynamically measures ambient room noise, computes **diaphragm cancellation headroom** ($75\% - 98\%$), and adapts between 4 custom ANC modes:
@@ -146,7 +146,7 @@ The boAt Nirvana Zenith uses 6 microphones (2 Feedforward, 2 Feedback, 2 Talk EN
   * **Adaptive 6-Mic AI**: Automatically calibrates filter depth to live ambient sound pressure.
 * **Zero Battery Waste**: The microphone sensing loop unbinds instantly when the app is placed in the background.
 
-## Before vs. After: The Acoustic Blueprint
+### Before vs. After: The Acoustic Blueprint
 
 | Frequency Band | Stock boAt Tuning | ZenithTuner Fix | What You Actually Hear |
 | :--- | :--- | :--- | :--- |
@@ -158,14 +158,14 @@ The boAt Nirvana Zenith uses 6 microphones (2 Feedforward, 2 Feedback, 2 Talk EN
 | **Treble (6.6kHz)** | **+5dB harsh sizzle spike**| **-3.8dB Precision Notch** | Metallic cymbals and harsh sibilance ('S' sounds) smoothed out |
 | **Air (11.5kHz)** | Rolled off, narrow staging | **+3.2dB High-Shelf Boost** | Soundstage widens; reverb trails and sparkle come alive |
 
-## The App UI & Experience
+### The App UI & Experience
 
 * **120Hz Zero-Recomposition Bode Plot**: Built using Compose's `Modifier.drawWithCache`. You can drag your finger across the frequency response curve to inspect exact frequency and decibel gain in real-time at 120Hz without triggering Compose recomposition passes.
 * **Full Material Design 3 (Light & Dark)**: Native M3 tonal palettes with dynamic top-bar theme toggling (`Dark`, `Light`, `System`) and contrast-safe status/navigation bar insets.
 * **Binaural Spatial Crossfeed**: Natural interaural time and frequency delay simulation (0%–100%) that eliminates the in-the-head listening fatigue typical of closed-back in-ear monitors.
 * **Media Volume & Preamp Card**: Hardware volume rocker integration with smooth digital gain compensation.
 
-## Recommended Earbud Setup
+### Recommended Earbud Setup
 
 Before firing up ZenithTuner for the first time, neutralize the earbud's local NVRAM state:
 1. Open the **boAt Hearables** app once.
@@ -175,6 +175,6 @@ Before firing up ZenithTuner for the first time, neutralize the earbud's local N
 
 The difference in vocal clarity, bass speed, and overall sound quality is immediate.
 
-## License
+### License
 
 Personal open-source project created by **Anurag Ambuj**. Released under the [MIT License](LICENSE).
