@@ -2,6 +2,7 @@ package com.zenith.tuner.dsp
 
 import android.media.audiofx.DynamicsProcessing
 import android.util.Log
+import com.zenith.tuner.anc.AncOptimizationMode
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.ConcurrentHashMap
@@ -47,6 +48,9 @@ class DynamicsProcessingManager {
 
     @Volatile
     private var ancAntiMud = true
+
+    @Volatile
+    private var ancOptimizationMode = AncOptimizationMode.ULTRA_50DB
 
     @Volatile
     private var subBassWeight = 1.0f
@@ -255,8 +259,9 @@ class DynamicsProcessingManager {
         // Sub-Bass: 0dB to +9.0dB deep punch (nominal 4.5dB)
         val subGain = 4.5f * subBass.coerceIn(0.0f, 2.0f)
 
-        // 50dB ANC Anti-Mud: -6.5dB surgical notch at 145Hz when active to stop 11mm diaphragm bloat, or 0dB when bypassed
-        val midBassGain = if (ancAntiMudEnabled) -6.5f else 0.0f
+        // 50dB ANC Anti-Mud: Active notch calculated per ANC Optimization Mode to stop 11mm diaphragm bloat
+        val midBassGain = if (ancAntiMudEnabled) ancOptimizationMode.midBassCutDb else 0.0f
+        val hpfFreq = if (ancAntiMudEnabled) ancOptimizationMode.hpfCutoffHz else 20.0f
 
         // Lower-mid boxiness cut at 320Hz: active when Anti-Mud is on
         val boxinessGain = if (ancAntiMudEnabled) -3.0f else 0.0f
@@ -265,12 +270,15 @@ class DynamicsProcessingManager {
         val vocal1650Gain = 3.2f * vocals.coerceIn(0.0f, 2.0f)
         val vocal3100Gain = 3.8f * vocals.coerceIn(0.0f, 2.0f)
 
-        stages[0] = stages[0].copy(enabled = ancAntiMudEnabled) // HPF 24Hz rumble strip
+        stages[0] = stages[0].copy(freq = hpfFreq, enabled = ancAntiMudEnabled) // Rumble/flutter strip
         stages[1] = stages[1].copy(gainDb = subGain)
         stages[2] = stages[2].copy(gainDb = midBassGain, enabled = ancAntiMudEnabled)
         stages[3] = stages[3].copy(gainDb = boxinessGain, enabled = ancAntiMudEnabled)
         stages[4] = stages[4].copy(gainDb = vocal1650Gain)
         stages[5] = stages[5].copy(gainDb = vocal3100Gain)
+
+        // Adjust MBC Damper Ratio based on ANC Mode to prevent driver saturation
+        mbcSettings = mbcSettings.copy(damperRatio = ancOptimizationMode.damperRatio)
 
         recomputeParameters()
         requestHardwareUpdate()
@@ -298,6 +306,13 @@ class DynamicsProcessingManager {
             recomputeParameters()
             requestHardwareUpdate()
         }
+        return getCurrentState()
+    }
+
+    @Synchronized
+    fun setAncOptimizationMode(mode: AncOptimizationMode): AcousticState {
+        this.ancOptimizationMode = mode
+        updateExpressParameters()
         return getCurrentState()
     }
 
@@ -342,6 +357,7 @@ class DynamicsProcessingManager {
             activePreset = activePreset,
             currentTab = currentTab,
             ancAntiMudEnabled = ancAntiMud,
+            ancOptimizationMode = ancOptimizationMode,
             subBassWeight = subBassWeight,
             vocalPresence = vocalPresence,
             crossfeedAmount = crossfeedAmount,

@@ -1,5 +1,7 @@
 package com.zenith.tuner.dsp
 
+import com.zenith.tuner.anc.AncOptimizationMode
+
 /**
  * Filter types for parametric acoustic correction
  */
@@ -79,6 +81,7 @@ data class AcousticState(
 
     // Express Controls
     val ancAntiMudEnabled: Boolean = true,
+    val ancOptimizationMode: AncOptimizationMode = AncOptimizationMode.ULTRA_50DB,
     val subBassWeight: Float = 1.0f,        // 0.0 to 2.0 (1.0 = nominal +3.6dB at 55Hz)
     val vocalPresence: Float = 1.0f,        // 0.0 to 2.0 (1.0 = nominal +2.8/+3.2dB)
     val crossfeedAmount: Float = 0.0f,      // 0.0 (off) to 1.0 (natural spatial crossfeed)

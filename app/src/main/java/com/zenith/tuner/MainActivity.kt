@@ -16,10 +16,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
+import com.zenith.tuner.anc.AmbientNoiseMonitor
+import com.zenith.tuner.anc.AncOptimizationMode
 import com.zenith.tuner.audio.VolumeManager
 import com.zenith.tuner.dsp.AcousticState
 import com.zenith.tuner.service.ZenithDspService
 import com.zenith.tuner.ui.ZenithTunerScreen
+import com.zenith.tuner.ui.theme.ThemeMode
 import com.zenith.tuner.ui.theme.ZenithTunerTheme
 
 class MainActivity : ComponentActivity() {
@@ -27,6 +30,9 @@ class MainActivity : ComponentActivity() {
     private var dspService: ZenithDspService? by mutableStateOf(null)
     private var isBound by mutableStateOf(false)
     private lateinit var volumeManager: VolumeManager
+    private lateinit var ambientNoiseMonitor: AmbientNoiseMonitor
+
+    private var currentThemeMode by mutableStateOf(ThemeMode.DARK)
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -43,7 +49,11 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* Gracefully handle notification and bluetooth permissions */ }
+    ) { permissions ->
+        if (permissions[Manifest.permission.RECORD_AUDIO] == true) {
+            ambientNoiseMonitor.startMonitoring()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,13 +63,15 @@ class MainActivity : ComponentActivity() {
         volumeManager = VolumeManager(this)
         volumeManager.startListening()
 
+        ambientNoiseMonitor = AmbientNoiseMonitor(this)
+
         enableEdgeToEdge()
 
         checkPermissions()
         startAndBindService()
 
         setContent {
-            ZenithTunerTheme {
+            ZenithTunerTheme(themeMode = currentThemeMode) {
                 val service = dspService
                 val state by if (service != null) {
                     service.stateFlow.collectAsState()
@@ -67,11 +79,14 @@ class MainActivity : ComponentActivity() {
                     remember { mutableStateOf(AcousticState()) }
                 }
                 val volumeRatio by volumeManager.volumeLevel.collectAsState()
+                val ambientReading by ambientNoiseMonitor.readingFlow.collectAsState()
 
                 ZenithTunerScreen(
                     state = state,
                     volumeRatio = volumeRatio,
                     digitalOutputGainDb = state.digitalOutputGainDb,
+                    themeMode = currentThemeMode,
+                    ambientReading = ambientReading,
                     onVolumeChange = { ratio ->
                         volumeManager.setVolumeRatio(ratio)
                         service?.setVolumeRatio(ratio)
@@ -86,6 +101,14 @@ class MainActivity : ComponentActivity() {
                     onTabSelect = { tab -> service?.setTab(tab) },
                     onPresetSelect = { preset -> service?.applyPreset(preset) },
                     onToggleAntiMud = { enabled -> service?.setAntiMudEnabled(enabled) },
+                    onAncModeSelect = { mode -> service?.setAncOptimizationMode(mode) },
+                    onToggleTheme = {
+                        currentThemeMode = when (currentThemeMode) {
+                            ThemeMode.SYSTEM -> ThemeMode.DARK
+                            ThemeMode.DARK -> ThemeMode.LIGHT
+                            ThemeMode.LIGHT -> ThemeMode.SYSTEM
+                        }
+                    },
                     onSubBassChange = { weight -> service?.setSubBassWeight(weight) },
                     onVocalPresenceChange = { presence -> service?.setVocalPresence(presence) },
                     onCrossfeedChange = { amount -> service?.setCrossfeedAmount(amount) },
@@ -101,6 +124,16 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ambientNoiseMonitor.startMonitoring()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        ambientNoiseMonitor.stopMonitoring()
     }
 
     private fun checkPermissions() {
@@ -123,6 +156,13 @@ class MainActivity : ComponentActivity() {
                 permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
             }
         }
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissions.add(Manifest.permission.RECORD_AUDIO)
+        }
         if (permissions.isNotEmpty()) {
             requestPermissionLauncher.launch(permissions.toTypedArray())
         }
@@ -137,6 +177,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         volumeManager.stopListening()
+        ambientNoiseMonitor.stopMonitoring()
         if (isBound) {
             unbindService(serviceConnection)
             isBound = false

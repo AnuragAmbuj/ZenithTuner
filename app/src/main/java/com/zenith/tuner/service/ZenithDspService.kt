@@ -203,6 +203,12 @@ class ZenithDspService : LifecycleService() {
         updateNotification()
     }
 
+    fun setAncOptimizationMode(mode: com.zenith.tuner.anc.AncOptimizationMode) {
+        dynamicsManager.setAncOptimizationMode(mode)
+        updateState()
+        updateNotification()
+    }
+
     fun setSubBassWeight(weight: Float) {
         dynamicsManager.updateExpressParameters(subBass = weight)
         updateState()

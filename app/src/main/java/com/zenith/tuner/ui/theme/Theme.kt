@@ -1,67 +1,116 @@
 package com.zenith.tuner.ui.theme
 
 import android.app.Activity
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-/**
- * Material Design 3 Dark Color Scheme for ZenithTuner.
- * Tailored for the boAt Nirvana Zenith (Mystique Black & Electric Cyan theme).
- */
+enum class ThemeMode(val displayName: String) {
+    SYSTEM("Auto"),
+    DARK("Dark"),
+    LIGHT("Light")
+}
+
 val ZenithDarkColorScheme = darkColorScheme(
-    primary = M3Primary,
-    onPrimary = M3OnPrimary,
-    primaryContainer = M3PrimaryContainer,
-    onPrimaryContainer = M3OnPrimaryContainer,
-    inversePrimary = M3Primary,
+    primary = M3DarkPrimary,
+    onPrimary = M3DarkOnPrimary,
+    primaryContainer = M3DarkPrimaryContainer,
+    onPrimaryContainer = M3DarkOnPrimaryContainer,
+    inversePrimary = M3DarkPrimary,
 
-    secondary = M3Secondary,
-    onSecondary = M3OnSecondary,
-    secondaryContainer = M3SecondaryContainer,
-    onSecondaryContainer = M3OnSecondaryContainer,
+    secondary = M3DarkSecondary,
+    onSecondary = M3DarkOnSecondary,
+    secondaryContainer = M3DarkSecondaryContainer,
+    onSecondaryContainer = M3DarkOnSecondaryContainer,
 
-    tertiary = M3Tertiary,
-    onTertiary = M3OnTertiary,
-    tertiaryContainer = M3TertiaryContainer,
-    onTertiaryContainer = M3OnTertiaryContainer,
+    tertiary = M3DarkTertiary,
+    onTertiary = M3DarkOnTertiary,
+    tertiaryContainer = M3DarkTertiaryContainer,
+    onTertiaryContainer = M3DarkOnTertiaryContainer,
 
-    background = M3Background,
-    onBackground = M3OnBackground,
-    surface = M3Surface,
-    onSurface = M3OnSurface,
-    surfaceVariant = M3SurfaceVariant,
-    onSurfaceVariant = M3OnSurfaceVariant,
+    background = M3DarkBackground,
+    onBackground = M3DarkOnBackground,
+    surface = M3DarkSurface,
+    onSurface = M3DarkOnSurface,
+    surfaceVariant = M3DarkSurfaceVariant,
+    onSurfaceVariant = M3DarkOnSurfaceVariant,
 
-    surfaceContainerLowest = M3SurfaceContainerLowest,
-    surfaceContainerLow = M3SurfaceContainerLow,
-    surfaceContainer = M3SurfaceContainer,
-    surfaceContainerHigh = M3SurfaceContainerHigh,
-    surfaceContainerHighest = M3SurfaceContainerHighest,
+    surfaceContainerLowest = M3DarkSurfaceContainerLowest,
+    surfaceContainerLow = M3DarkSurfaceContainerLow,
+    surfaceContainer = M3DarkSurfaceContainer,
+    surfaceContainerHigh = M3DarkSurfaceContainerHigh,
+    surfaceContainerHighest = M3DarkSurfaceContainerHighest,
 
-    outline = M3Outline,
-    outlineVariant = M3OutlineVariant
+    outline = M3DarkOutline,
+    outlineVariant = M3DarkOutlineVariant
+)
+
+val ZenithLightColorScheme = lightColorScheme(
+    primary = M3LightPrimary,
+    onPrimary = M3LightOnPrimary,
+    primaryContainer = M3LightPrimaryContainer,
+    onPrimaryContainer = M3LightOnPrimaryContainer,
+    inversePrimary = M3DarkPrimary,
+
+    secondary = M3LightSecondary,
+    onSecondary = M3LightOnSecondary,
+    secondaryContainer = M3LightSecondaryContainer,
+    onSecondaryContainer = M3LightOnSecondaryContainer,
+
+    tertiary = M3LightTertiary,
+    onTertiary = M3LightOnTertiary,
+    tertiaryContainer = M3LightTertiaryContainer,
+    onTertiaryContainer = M3LightOnTertiaryContainer,
+
+    background = M3LightBackground,
+    onBackground = M3LightOnBackground,
+    surface = M3LightSurface,
+    onSurface = M3LightOnSurface,
+    surfaceVariant = M3LightSurfaceVariant,
+    onSurfaceVariant = M3LightOnSurfaceVariant,
+
+    surfaceContainerLowest = M3LightSurfaceContainerLowest,
+    surfaceContainerLow = M3LightSurfaceContainerLow,
+    surfaceContainer = M3LightSurfaceContainer,
+    surfaceContainerHigh = M3LightSurfaceContainerHigh,
+    surfaceContainerHighest = M3LightSurfaceContainerHighest,
+
+    outline = M3LightOutline,
+    outlineVariant = M3LightOutlineVariant
 )
 
 @Composable
-fun ZenithTunerTheme(content: @Composable () -> Unit) {
+fun ZenithTunerTheme(
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    content: @Composable () -> Unit
+) {
+    val systemInDark = isSystemInDarkTheme()
+    val useDarkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> systemInDark
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+    }
+
+    val colorScheme = if (useDarkTheme) ZenithDarkColorScheme else ZenithLightColorScheme
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = false
+                isAppearanceLightStatusBars = !useDarkTheme
+                isAppearanceLightNavigationBars = !useDarkTheme
             }
         }
     }
 
     MaterialTheme(
-        colorScheme = ZenithDarkColorScheme,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )

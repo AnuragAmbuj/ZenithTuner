@@ -18,8 +18,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zenith.tuner.anc.AmbientNoiseReading
+import com.zenith.tuner.anc.AncOptimizationMode
 import com.zenith.tuner.dsp.*
 import com.zenith.tuner.ui.components.*
 import com.zenith.tuner.ui.theme.*
@@ -30,6 +33,8 @@ fun ZenithTunerScreen(
     state: AcousticState,
     volumeRatio: Float,
     digitalOutputGainDb: Float,
+    themeMode: ThemeMode,
+    ambientReading: com.zenith.tuner.anc.AmbientNoiseReading,
     onVolumeChange: (Float) -> Unit,
     onToggleMute: () -> Unit,
     onDigitalGainChange: (Float) -> Unit,
@@ -37,6 +42,8 @@ fun ZenithTunerScreen(
     onTabSelect: (TunerTab) -> Unit,
     onPresetSelect: (AcousticPreset) -> Unit,
     onToggleAntiMud: (Boolean) -> Unit,
+    onAncModeSelect: (com.zenith.tuner.anc.AncOptimizationMode) -> Unit,
+    onToggleTheme: () -> Unit,
     onSubBassChange: (Float) -> Unit,
     onVocalPresenceChange: (Float) -> Unit,
     onCrossfeedChange: (Float) -> Unit,
@@ -46,6 +53,7 @@ fun ZenithTunerScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val haptic = LocalHapticFeedback.current
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -92,6 +100,24 @@ fun ZenithTunerScreen(
                     }
                 },
                 actions = {
+                    // Theme Switcher Button (Auto -> Dark -> Light)
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleTheme()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = when (themeMode) {
+                                ThemeMode.DARK -> Icons.Default.DarkMode
+                                ThemeMode.LIGHT -> Icons.Default.LightMode
+                                ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
+                            },
+                            contentDescription = "Theme: ${themeMode.displayName}",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -231,10 +257,12 @@ fun ZenithTunerScreen(
                         onToggle = onToggleDsp
                     )
 
-                    // 50dB ANC Anti-Mud Card
-                    AncAntiMudCard(
-                        enabled = state.ancAntiMudEnabled,
-                        onToggle = onToggleAntiMud
+                    // 6-Mic 50dB Hybrid ANC Decoupler & Phone Room Sensing Card
+                    AncOptimizationCard(
+                        state = state,
+                        ambientReading = ambientReading,
+                        onToggleAntiMud = onToggleAntiMud,
+                        onSelectMode = onAncModeSelect
                     )
 
                     // Sub-Bass Punch Slider
@@ -431,5 +459,73 @@ private fun PresetVaultCard(
                 )
             )
         }
+    }
+}
+
+@Preview(name = "ZenithTuner Dark Theme", showBackground = true, backgroundColor = 0xFF0D0D11)
+@Composable
+fun ZenithTunerDarkPreview() {
+    ZenithTunerTheme(themeMode = ThemeMode.DARK) {
+        ZenithTunerScreen(
+            state = AcousticState(),
+            volumeRatio = 0.7f,
+            digitalOutputGainDb = 0f,
+            themeMode = ThemeMode.DARK,
+            ambientReading = AmbientNoiseReading(
+                splDb = 48.5f,
+                environmentCategory = "Office & Moderate Noise",
+                cancellationHeadroomPercent = 91,
+                isMicActive = true
+            ),
+            onVolumeChange = {},
+            onToggleMute = {},
+            onDigitalGainChange = {},
+            onToggleDsp = {},
+            onTabSelect = {},
+            onPresetSelect = {},
+            onToggleAntiMud = {},
+            onAncModeSelect = {},
+            onToggleTheme = {},
+            onSubBassChange = {},
+            onVocalPresenceChange = {},
+            onCrossfeedChange = {},
+            onParametricChange = { _, _, _, _, _ -> },
+            onPreampChange = { _, _ -> },
+            onMbcChange = {}
+        )
+    }
+}
+
+@Preview(name = "ZenithTuner Light Theme", showBackground = true, backgroundColor = 0xFFFBF8FE)
+@Composable
+fun ZenithTunerLightPreview() {
+    ZenithTunerTheme(themeMode = ThemeMode.LIGHT) {
+        ZenithTunerScreen(
+            state = AcousticState(),
+            volumeRatio = 0.7f,
+            digitalOutputGainDb = 0f,
+            themeMode = ThemeMode.LIGHT,
+            ambientReading = AmbientNoiseReading(
+                splDb = 42.0f,
+                environmentCategory = "Quiet Room Ambience",
+                cancellationHeadroomPercent = 95,
+                isMicActive = true
+            ),
+            onVolumeChange = {},
+            onToggleMute = {},
+            onDigitalGainChange = {},
+            onToggleDsp = {},
+            onTabSelect = {},
+            onPresetSelect = {},
+            onToggleAntiMud = {},
+            onAncModeSelect = {},
+            onToggleTheme = {},
+            onSubBassChange = {},
+            onVocalPresenceChange = {},
+            onCrossfeedChange = {},
+            onParametricChange = { _, _, _, _, _ -> },
+            onPreampChange = { _, _ -> },
+            onMbcChange = {}
+        )
     }
 }

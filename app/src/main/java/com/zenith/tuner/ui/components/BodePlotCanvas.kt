@@ -33,32 +33,46 @@ fun BodePlotCanvas(
     var touchX by remember { mutableFloatStateOf(-1f) }
     var isTouching by remember { mutableStateOf(false) }
 
+    val colorScheme = androidx.compose.material3.MaterialTheme.colorScheme
+    val gridColor = colorScheme.outlineVariant.copy(alpha = 0.45f)
+    val zeroLineColor = colorScheme.outline
+    val curveColor = if (isDspActive) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val glowColor = if (isDspActive) colorScheme.primary.copy(alpha = 0.30f) else Color.Transparent
+    val labelColorInt = colorScheme.onSurfaceVariant.toArgb()
+    val tooltipBgInt = colorScheme.surfaceContainerHighest.toArgb()
+    val tooltipBorderInt = colorScheme.primary.toArgb()
+    val tooltipTextInt = colorScheme.onSurface.toArgb()
+    val tooltipSubInt = colorScheme.primary.toArgb()
+
     // Native text paint for crisp hardware text rendering inside Canvas without Compose layout passes
     val textPaint = remember {
         Paint().apply {
-            color = android.graphics.Color.argb(180, 142, 142, 147)
             textSize = 28f
             typeface = Typeface.MONOSPACE
             isAntiAlias = true
         }
+    }.apply {
+        color = labelColorInt
     }
 
     val tooltipPaint = remember {
         Paint().apply {
-            color = android.graphics.Color.WHITE
             textSize = 30f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             isAntiAlias = true
         }
+    }.apply {
+        color = tooltipTextInt
     }
 
     val tooltipSubPaint = remember {
         Paint().apply {
-            color = android.graphics.Color.argb(220, 0, 229, 255)
             textSize = 24f
             typeface = Typeface.MONOSPACE
             isAntiAlias = true
         }
+    }.apply {
+        color = tooltipSubInt
     }
 
     Box(
@@ -166,13 +180,13 @@ fun BodePlotCanvas(
                 val fillBrush = Brush.verticalGradient(
                     colors = if (isDspActive) {
                         listOf(
-                            ElectricCyan.copy(alpha = 0.28f),
-                            ElectricAzure.copy(alpha = 0.12f),
+                            colorScheme.primary.copy(alpha = 0.28f),
+                            colorScheme.secondary.copy(alpha = 0.10f),
                             Color.Transparent
                         )
                     } else {
                         listOf(
-                            TitaniumMuted.copy(alpha = 0.15f),
+                            colorScheme.onSurfaceVariant.copy(alpha = 0.12f),
                             Color.Transparent
                         )
                     },
@@ -198,7 +212,7 @@ fun BodePlotCanvas(
                     gridFreqs.forEach { (freq, label) ->
                         val x = freqToX(freq)
                         drawLine(
-                            color = ObsidianBorder.copy(alpha = 0.5f),
+                            color = gridColor,
                             start = Offset(x, 0f),
                             end = Offset(x, effectiveHeight),
                             strokeWidth = 1f
@@ -217,7 +231,7 @@ fun BodePlotCanvas(
                         val y = dbToY(db)
                         val isZero = abs(db) < 0.1f
                         drawLine(
-                            color = if (isZero) TitaniumMuted else ObsidianBorder.copy(alpha = 0.4f),
+                            color = if (isZero) zeroLineColor else gridColor,
                             start = Offset(0f, y),
                             end = Offset(width, y),
                             strokeWidth = if (isZero) 1.5f else 1f,
@@ -235,7 +249,7 @@ fun BodePlotCanvas(
                     if (isDspActive && preampDb < -0.1f) {
                         val preampY = dbToY(preampDb)
                         drawLine(
-                            color = DamperAmber.copy(alpha = 0.45f),
+                            color = DamperAmber.copy(alpha = 0.55f),
                             start = Offset(0f, preampY),
                             end = Offset(width, preampY),
                             strokeWidth = 1f,
@@ -247,16 +261,18 @@ fun BodePlotCanvas(
                     drawPath(path = fillPath, brush = fillBrush)
 
                     // Spline Glow
-                    drawPath(
-                        path = splinePath,
-                        color = if (isDspActive) ElectricCyan.copy(alpha = 0.30f) else TitaniumMuted.copy(alpha = 0.3f),
-                        style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    )
+                    if (isDspActive) {
+                        drawPath(
+                            path = splinePath,
+                            color = glowColor,
+                            style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        )
+                    }
 
                     // Crisp Line
                     drawPath(
                         path = splinePath,
-                        color = if (isDspActive) ElectricCyan else TitaniumGray,
+                        color = curveColor,
                         style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                     )
 
@@ -268,7 +284,7 @@ fun BodePlotCanvas(
 
                         // Vertical Scrubber Line
                         drawLine(
-                            color = ElectricCyan.copy(alpha = 0.85f),
+                            color = colorScheme.primary.copy(alpha = 0.85f),
                             start = Offset(touchX, 0f),
                             end = Offset(touchX, effectiveHeight),
                             strokeWidth = 1.5f,
@@ -277,12 +293,12 @@ fun BodePlotCanvas(
 
                         // Glowing Crosshair Ring on Curve
                         drawCircle(
-                            color = ElectricCyan.copy(alpha = 0.3f),
+                            color = colorScheme.primary.copy(alpha = 0.3f),
                             radius = 12.dp.toPx(),
                             center = Offset(touchX, curY)
                         )
                         drawCircle(
-                            color = ElectricCyan,
+                            color = colorScheme.primary,
                             radius = 4.dp.toPx(),
                             center = Offset(touchX, curY)
                         )
@@ -300,7 +316,9 @@ fun BodePlotCanvas(
                             gainDb = curDb,
                             tag = tag,
                             titlePaint = tooltipPaint,
-                            subPaint = tooltipSubPaint
+                            subPaint = tooltipSubPaint,
+                            tooltipBgColor = tooltipBgInt,
+                            tooltipBorderColor = tooltipBorderInt
                         )
                     }
                 }
@@ -363,7 +381,9 @@ private fun drawInspectionTooltip(
     gainDb: Float,
     tag: String,
     titlePaint: Paint,
-    subPaint: Paint
+    subPaint: Paint,
+    tooltipBgColor: Int,
+    tooltipBorderColor: Int
 ) {
     val freqStr = if (freq >= 1000.0) {
         String.format("%.1fkHz", freq / 1000.0)
@@ -385,12 +405,12 @@ private fun drawInspectionTooltip(
     if (top < 16f) top = touchY + 24f
 
     val bgPaint = Paint().apply {
-        color = android.graphics.Color.argb(235, 17, 17, 21)
+        color = tooltipBgColor
         style = Paint.Style.FILL
         isAntiAlias = true
     }
     val borderPaint = Paint().apply {
-        color = android.graphics.Color.argb(160, 0, 229, 255)
+        color = tooltipBorderColor
         style = Paint.Style.STROKE
         strokeWidth = 2f
         isAntiAlias = true
