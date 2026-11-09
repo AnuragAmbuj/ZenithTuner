@@ -272,10 +272,10 @@ impl CustomTuningSpec {
     ) -> Self {
         let sub_scale = (sub_bass_weight as f64).clamp(0.0, 2.0);
         let vocal_scale = (vocal_presence as f64).clamp(0.0, 2.0);
-        let mid_bass_gain = if anc_anti_mud { -5.2 } else { -1.5 };
+        let mid_bass_gain = if anc_anti_mud { -6.5 } else { -2.0 };
 
         let stages = [
-            // Stage 0: HPF 24Hz
+            // Stage 0: HPF 24Hz Sub-Rumble Strip
             ParametricStage {
                 enabled: true,
                 filter_type: FilterType::HighPass,
@@ -283,15 +283,15 @@ impl CustomTuningSpec {
                 q: 0.7071,
                 gain_db: 0.0,
             },
-            // Stage 1: Low-Shelf 55Hz
+            // Stage 1: Low-Shelf 55Hz Sub-Bass Slam
             ParametricStage {
                 enabled: true,
                 filter_type: FilterType::LowShelf,
                 freq: 55.0,
                 q: 0.71,
-                gain_db: 3.6 * sub_scale,
+                gain_db: 5.5 * sub_scale,
             },
-            // Stage 2: Peaking 145Hz (50dB ANC Anti-Mud)
+            // Stage 2: Peaking 145Hz (50dB ANC Anti-Mud & Resonance Notch)
             ParametricStage {
                 enabled: true,
                 filter_type: FilterType::Peaking,
@@ -299,29 +299,29 @@ impl CustomTuningSpec {
                 q: 1.8,
                 gain_db: mid_bass_gain,
             },
-            // Stage 3: Peaking 320Hz Boxiness Cut
+            // Stage 3: Peaking 320Hz Boxiness & Chestiness Cut
             ParametricStage {
                 enabled: true,
                 filter_type: FilterType::Peaking,
                 freq: 320.0,
                 q: 1.2,
-                gain_db: -2.4,
+                gain_db: -2.5,
             },
-            // Stage 4: Peaking 1650Hz Vocal Forwardness
+            // Stage 4: Peaking 1650Hz Core Vocal Forwardness
             ParametricStage {
                 enabled: true,
                 filter_type: FilterType::Peaking,
                 freq: 1650.0,
                 q: 1.4,
-                gain_db: 2.8 * vocal_scale,
+                gain_db: 3.5 * vocal_scale,
             },
-            // Stage 5: Peaking 3100Hz Pinna Ear-Gain
+            // Stage 5: Peaking 3100Hz Pinna Ear-Gain (Intimacy & Clarity)
             ParametricStage {
                 enabled: true,
                 filter_type: FilterType::Peaking,
                 freq: 3100.0,
                 q: 1.8,
-                gain_db: 3.2 * vocal_scale,
+                gain_db: 4.2 * vocal_scale,
             },
             // Stage 6: Peaking 6600Hz AAC Treble De-Sizzle Notch
             ParametricStage {
@@ -329,15 +329,15 @@ impl CustomTuningSpec {
                 filter_type: FilterType::Peaking,
                 freq: 6600.0,
                 q: 2.5,
-                gain_db: -3.8,
+                gain_db: -4.0,
             },
-            // Stage 7: High-Shelf 11500Hz Air & Soundstage
+            // Stage 7: High-Shelf 11500Hz Top-Octave Air & Soundstage
             ParametricStage {
                 enabled: true,
                 filter_type: FilterType::HighShelf,
                 freq: 11500.0,
                 q: 0.71,
-                gain_db: 2.5,
+                gain_db: 3.5,
             },
         ];
 
@@ -397,12 +397,24 @@ impl CustomTuningSpec {
     }
 }
 
-/// Generates the 64 logarithmically spaced frequencies across 20Hz - 20000Hz
+/// Generates the 64 logarithmically spaced frequencies across 20Hz - 20000Hz (for Bode plot visualization)
 pub fn generate_log_frequencies() -> [f64; TOTAL_BANDS] {
     let mut freqs = [0.0; TOTAL_BANDS];
     let ratio = MAX_FREQ / MIN_FREQ;
     for i in 0..TOTAL_BANDS {
         let exponent = (i as f64) / ((TOTAL_BANDS - 1) as f64);
+        freqs[i] = MIN_FREQ * ratio.powf(exponent);
+    }
+    freqs
+}
+
+/// Generates the 32 logarithmically spaced cutoff frequencies across 20Hz - 20000Hz
+/// ensuring full-spectrum coverage for Android DynamicsProcessing Pre-EQ without serial splitting.
+pub fn generate_32_log_frequencies() -> [f64; PRE_EQ_BANDS] {
+    let mut freqs = [0.0; PRE_EQ_BANDS];
+    let ratio = MAX_FREQ / MIN_FREQ;
+    for i in 0..PRE_EQ_BANDS {
+        let exponent = (i as f64) / ((PRE_EQ_BANDS - 1) as f64);
         freqs[i] = MIN_FREQ * ratio.powf(exponent);
     }
     freqs
@@ -452,11 +464,12 @@ pub fn compute_custom_dsp(
         biquads[i] = stage.to_biquad(sr);
     }
 
-    let freqs = generate_log_frequencies();
+    // 1. Full 64-band frequency spline for 120Hz Bode plot rendering
+    let freqs_64 = generate_log_frequencies();
     let mut full_curve = [0.0f32; TOTAL_BANDS];
     let mut max_boost = 0.0f64;
 
-    for (i, &f) in freqs.iter().enumerate() {
+    for (i, &f) in freqs_64.iter().enumerate() {
         let gain_db = evaluate_spec_db(spec, &biquads, f, sr);
         full_curve[i] = gain_db as f32;
         if gain_db > max_boost {
@@ -464,7 +477,7 @@ pub fn compute_custom_dsp(
         }
     }
 
-    // High-resolution scan across 128 intermediate frequencies
+    // High-resolution scan across 128 intermediate frequencies to find peak excursion
     for step in 0..128 {
         let exp = (step as f64) / 127.0;
         let test_f = MIN_FREQ * (MAX_FREQ / MIN_FREQ).powf(exp);
@@ -485,19 +498,24 @@ pub fn compute_custom_dsp(
         }
     };
 
+    // 2. Full-spectrum 32 bands for Android DynamicsProcessing Pre-EQ
+    // Spans 20Hz to 20,000Hz without chopping the spectrum across stages!
+    let freqs_32 = generate_32_log_frequencies();
     let mut pre_eq_freqs = [0.0f32; PRE_EQ_BANDS];
     let mut pre_eq_gains = [0.0f32; PRE_EQ_BANDS];
     let mut post_eq_freqs = [0.0f32; POST_EQ_BANDS];
     let mut post_eq_gains = [0.0f32; POST_EQ_BANDS];
 
     for i in 0..PRE_EQ_BANDS {
-        pre_eq_freqs[i] = freqs[i] as f32;
-        pre_eq_gains[i] = full_curve[i];
+        let f = freqs_32[i];
+        pre_eq_freqs[i] = f as f32;
+        pre_eq_gains[i] = evaluate_spec_db(spec, &biquads, f, sr) as f32;
     }
 
+    // Post-EQ is set to pure unity gain (0dB flat) so it does NOT conflict with or flatten Pre-EQ in series
     for i in 0..POST_EQ_BANDS {
-        post_eq_freqs[i] = freqs[PRE_EQ_BANDS + i] as f32;
-        post_eq_gains[i] = full_curve[PRE_EQ_BANDS + i];
+        post_eq_freqs[i] = freqs_32[i] as f32;
+        post_eq_gains[i] = 0.0f32;
     }
 
     DspComputationResult {
@@ -779,8 +797,9 @@ mod tests {
         let res_with = compute_dsp_parameters(sample_rate, true, 1.0, 1.0);
         let res_without = compute_dsp_parameters(sample_rate, false, 1.0, 1.0);
 
-        let mid_bass_with = res_with.pre_eq_gains[14]; // near 145Hz
-        let mid_bass_without = res_without.pre_eq_gains[14];
+        // Pre-EQ band 9 is around 151Hz
+        let mid_bass_with = res_with.pre_eq_gains[9];
+        let mid_bass_without = res_without.pre_eq_gains[9];
 
         assert!(mid_bass_with < mid_bass_without);
     }
@@ -790,11 +809,11 @@ mod tests {
         let sample_rate = 44100.0;
         let res = compute_dsp_parameters(sample_rate, true, 1.0, 1.0);
 
-        // Band around 6681Hz is post_eq index 21
-        let notch_gain = res.post_eq_gains[21];
-        let adjacent_gain = res.post_eq_gains[18]; // ~4800Hz
+        // Pre-EQ band 26 (~7068Hz) covers the 6600Hz notch
+        let notch_gain = res.pre_eq_gains[26];
+        let air_gain = res.pre_eq_gains[28]; // ~11kHz
         assert!(notch_gain < 0.0);
-        assert!(notch_gain < adjacent_gain);
+        assert!(notch_gain < air_gain);
     }
 
     #[test]

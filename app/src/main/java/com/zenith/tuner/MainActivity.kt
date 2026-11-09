@@ -129,6 +129,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         ambientNoiseMonitor.startMonitoring()
+        dspService?.scanActiveSessions()
     }
 
     override fun onPause() {

@@ -79,28 +79,64 @@ class ZenithDspService : LifecycleService() {
     }
 
     private fun extractSessionId(config: AudioPlaybackConfiguration): Int {
+        // 1. Try getSessionId
         try {
             val method = config.javaClass.getMethod("getSessionId")
             val id = method.invoke(config) as? Int
             if (id != null && id > 0) return id
         } catch (_: Throwable) {}
 
+        // 2. Try getClientAudioSessionId
         try {
-            val field = config.javaClass.getDeclaredField("mSessionId")
-            field.isAccessible = true
-            val id = field.getInt(config)
-            if (id > 0) return id
+            val method = config.javaClass.getMethod("getClientAudioSessionId")
+            val id = method.invoke(config) as? Int
+            if (id != null && id > 0) return id
         } catch (_: Throwable) {}
 
+        // 3. Try reflection on mSessionId or mClientAudioSessionId
+        for (fieldName in listOf("mSessionId", "mClientAudioSessionId")) {
+            try {
+                val field = config.javaClass.getDeclaredField(fieldName)
+                field.isAccessible = true
+                val id = field.getInt(config)
+                if (id > 0) return id
+            } catch (_: Throwable) {}
+        }
+
+        // 4. Try parsing config.toString() with robust regex
+        // Matches: "client sessionId: 2169", "sessionId=2169", "session:2169", etc.
         try {
             val str = config.toString()
-            val match = Regex("session:(\\d+)").find(str)
+            val match = Regex("(?i)session(?:Id)?\\s*[:=]\\s*(\\d+)").find(str)
             if (match != null) {
-                return match.groupValues[1].toInt()
+                val id = match.groupValues[1].toInt()
+                if (id > 0) return id
             }
         } catch (_: Throwable) {}
 
         return -1
+    }
+
+    fun scanActiveSessions() {
+        try {
+            val activeConfigs = audioManager.activePlaybackConfigurations
+            var changed = false
+            for (config in activeConfigs) {
+                val sessionId = extractSessionId(config)
+                if (sessionId > 0) {
+                    if (dynamicsManager.attachSession(sessionId)) {
+                        changed = true
+                        Log.i(TAG, "Discovered and attached to active player audio session $sessionId")
+                    }
+                }
+            }
+            if (changed) {
+                updateState()
+                updateNotification()
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Could not query active playback configurations", e)
+        }
     }
 
     private val _stateFlow = MutableStateFlow(dynamicsManager.getCurrentState())
@@ -119,17 +155,7 @@ class ZenithDspService : LifecycleService() {
         dynamicsManager.attachSession(DynamicsProcessingManager.GLOBAL_AUDIO_SESSION_ID)
 
         // 2. Query already active media playback sessions (Spotify, YouTube, Poweramp, etc.)
-        try {
-            val activeConfigs = audioManager.activePlaybackConfigurations
-            for (config in activeConfigs) {
-                val sessionId = extractSessionId(config)
-                if (sessionId > 0) {
-                    dynamicsManager.attachSession(sessionId)
-                }
-            }
-        } catch (e: Throwable) {
-            Log.w(TAG, "Could not query active playback configurations", e)
-        }
+        scanActiveSessions()
 
         // 3. Register live playback listener for incoming media streams
         try {
@@ -162,6 +188,7 @@ class ZenithDspService : LifecycleService() {
                     if (sessionId > 0) {
                         dynamicsManager.attachSession(sessionId)
                         updateState()
+                        updateNotification()
                     }
                 }
                 ACTION_SESSION_CLOSE -> {
@@ -169,6 +196,7 @@ class ZenithDspService : LifecycleService() {
                     if (sessionId > 0) {
                         dynamicsManager.detachSession(sessionId)
                         updateState()
+                        updateNotification()
                     }
                 }
                 ACTION_STOP -> {

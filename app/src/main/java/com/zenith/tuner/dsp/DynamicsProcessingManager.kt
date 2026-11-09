@@ -68,7 +68,7 @@ class DynamicsProcessingManager {
     private var manualPreampDb = -3.8f
 
     @Volatile
-    private var digitalOutputGainDb = 2.0f // +2.0dB nominal output compensation for clear, punchy volume
+    private var digitalOutputGainDb = 3.0f // +3.0dB nominal output compensation for clear, punchy volume
 
     @Volatile
     private var volumeRatio = 0.7f
@@ -256,19 +256,19 @@ class DynamicsProcessingManager {
         this.crossfeedAmount = crossfeed
 
         // Dynamic acoustic targets engineered for boAt Nirvana Zenith:
-        // Sub-Bass: 0dB to +9.0dB deep punch (nominal 4.5dB)
-        val subGain = 4.5f * subBass.coerceIn(0.0f, 2.0f)
+        // Sub-Bass: 0dB to +11.0dB deep visceral punch (nominal +5.5dB)
+        val subGain = 5.5f * subBass.coerceIn(0.0f, 2.0f)
 
         // 50dB ANC Anti-Mud: Active notch calculated per ANC Optimization Mode to stop 11mm diaphragm bloat
-        val midBassGain = if (ancAntiMudEnabled) ancOptimizationMode.midBassCutDb else 0.0f
+        val midBassGain = if (ancAntiMudEnabled) ancOptimizationMode.midBassCutDb else -2.0f
         val hpfFreq = if (ancAntiMudEnabled) ancOptimizationMode.hpfCutoffHz else 20.0f
 
         // Lower-mid boxiness cut at 320Hz: active when Anti-Mud is on
-        val boxinessGain = if (ancAntiMudEnabled) -3.0f else 0.0f
+        val boxinessGain = if (ancAntiMudEnabled) -2.5f else 0.0f
 
-        // Vocal presence pinna ear-gain: recessed (0dB) to intimate (+7.6dB)
-        val vocal1650Gain = 3.2f * vocals.coerceIn(0.0f, 2.0f)
-        val vocal3100Gain = 3.8f * vocals.coerceIn(0.0f, 2.0f)
+        // Vocal presence pinna ear-gain: recessed (0dB) to forward and intimate (+8.4dB)
+        val vocal1650Gain = 3.5f * vocals.coerceIn(0.0f, 2.0f)
+        val vocal3100Gain = 4.2f * vocals.coerceIn(0.0f, 2.0f)
 
         stages[0] = stages[0].copy(freq = hpfFreq, enabled = ancAntiMudEnabled) // Rumble/flutter strip
         stages[1] = stages[1].copy(gainDb = subGain)
@@ -401,11 +401,6 @@ class DynamicsProcessingManager {
                     val g = buffer[32 + b]
                     dp.setPreEqBandAllChannelsTo(b, DynamicsProcessing.EqBand(true, f, g))
                 }
-                for (b in 0 until POST_EQ_BANDS) {
-                    val f = buffer[64 + b]
-                    val g = buffer[96 + b]
-                    dp.setPostEqBandAllChannelsTo(b, DynamicsProcessing.EqBand(true, f, g))
-                }
             } catch (e: Throwable) {
                 Log.e(TAG, "Error applying dynamic parameters to hardware effect", e)
             }
@@ -455,19 +450,19 @@ class DynamicsProcessingManager {
         val builder = DynamicsProcessing.Config.Builder(
             DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
             CHANNEL_COUNT,
-            true,
+            true, // configPreEqInUse: 32 full-spectrum bands across 20Hz - 20,000Hz
             PRE_EQ_BANDS,
-            true,
+            true, // configMbcInUse: 4-band multi-band compressor transient damper
             MBC_BANDS,
-            true,
-            POST_EQ_BANDS,
-            true
+            false, // configPostEqInUse: disabled to prevent serial destructive interference
+            0,
+            true // configLimiterInUse: true-peak 0dBFS guard
         )
 
         builder.setPreferredFrameDuration(10.0f)
         builder.setInputGainAllChannelsTo(effectiveGain)
 
-        // Pre-EQ
+        // Pre-EQ: 32 high-resolution logarithmically spaced bands covering 20Hz - 20kHz
         val preEq = DynamicsProcessing.Eq(true, true, PRE_EQ_BANDS)
         for (b in 0 until PRE_EQ_BANDS) {
             val cutoff = buffer[b]
@@ -475,15 +470,6 @@ class DynamicsProcessingManager {
             preEq.setBand(b, DynamicsProcessing.EqBand(true, cutoff, gain))
         }
         builder.setPreEqAllChannelsTo(preEq)
-
-        // Post-EQ
-        val postEq = DynamicsProcessing.Eq(true, true, POST_EQ_BANDS)
-        for (b in 0 until POST_EQ_BANDS) {
-            val cutoff = buffer[64 + b]
-            val gain = buffer[96 + b]
-            postEq.setBand(b, DynamicsProcessing.EqBand(true, cutoff, gain))
-        }
-        builder.setPostEqAllChannelsTo(postEq)
 
         // 4-Band Multi-Band Compressor
         val mbc = DynamicsProcessing.Mbc(true, true, MBC_BANDS)

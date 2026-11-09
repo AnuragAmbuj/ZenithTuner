@@ -34,7 +34,11 @@ class AudioSessionReceiver : BroadcastReceiver() {
                         this.action = ZenithDspService.ACTION_SESSION_OPEN
                         putExtra(ZenithDspService.EXTRA_SESSION_ID, sessionId)
                     }
-                    ZenithDspService.startService(context)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
+                    }
                 }
             }
             AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION -> {
