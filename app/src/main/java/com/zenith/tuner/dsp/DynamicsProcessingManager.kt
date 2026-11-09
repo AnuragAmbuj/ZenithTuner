@@ -105,11 +105,15 @@ class DynamicsProcessingManager {
 
         try {
             val config = buildDynamicsProcessingConfig()
-            val dp = DynamicsProcessing(PRIORITY_MASTER, sessionId, config).apply {
-                enabled = isEngineEnabled
-            }
+            val dp = DynamicsProcessing(PRIORITY_MASTER, sessionId, config)
+            val setResult = dp.setEnabled(isEngineEnabled)
+            val actualEnabled = dp.enabled
+            val hasCtrl = dp.hasControl()
             activeEffects[sessionId] = dp
-            Log.i(TAG, "Attached DynamicsProcessing to session $sessionId (Priority=$PRIORITY_MASTER, Enabled=$isEngineEnabled)")
+            Log.i(
+                TAG,
+                "Attached DynamicsProcessing to session $sessionId: setResult=$setResult, enabled=$actualEnabled, hasControl=$hasCtrl (Target=$isEngineEnabled)"
+            )
             return true
         } catch (e: Throwable) {
             Log.e(TAG, "Failed to attach DynamicsProcessing to session $sessionId", e)
@@ -147,11 +151,12 @@ class DynamicsProcessingManager {
     @Synchronized
     fun setEnabled(enabled: Boolean) {
         isEngineEnabled = enabled
-        activeEffects.values.forEach { dp ->
+        activeEffects.forEach { (session, dp) ->
             try {
-                dp.enabled = enabled
+                val res = dp.setEnabled(enabled)
+                Log.i(TAG, "Session $session setEnabled($enabled) returned $res, enabled=${dp.enabled}")
             } catch (e: Throwable) {
-                Log.e(TAG, "Failed to toggle enabled state", e)
+                Log.e(TAG, "Failed to toggle enabled state for session $session", e)
             }
         }
     }

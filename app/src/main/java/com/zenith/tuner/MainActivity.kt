@@ -33,12 +33,17 @@ class MainActivity : ComponentActivity() {
     private lateinit var ambientNoiseMonitor: AmbientNoiseMonitor
 
     private var currentThemeMode by mutableStateOf(ThemeMode.DARK)
+    private var pendingSessionId: Int = -1
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             val localBinder = binder as? ZenithDspService.LocalBinder
             dspService = localBinder?.getService()
             isBound = true
+            if (pendingSessionId > 0) {
+                dspService?.onAudioSessionOpened(pendingSessionId)
+                pendingSessionId = -1
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -57,6 +62,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleSessionIntent(intent)
         // Ensure hardware volume rocker always directs to media stream
         volumeControlStream = AudioManager.STREAM_MUSIC
 
@@ -135,6 +141,24 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         ambientNoiseMonitor.stopMonitoring()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSessionIntent(intent)
+    }
+
+    private fun handleSessionIntent(intent: Intent?) {
+        val sessionId = intent?.getIntExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, -1) ?: -1
+        if (sessionId > 0) {
+            android.util.Log.i("MainActivity", "Received audio session from intent: $sessionId")
+            if (isBound && dspService != null) {
+                dspService?.onAudioSessionOpened(sessionId)
+            } else {
+                pendingSessionId = sessionId
+            }
+        }
     }
 
     private fun checkPermissions() {
