@@ -272,7 +272,7 @@ impl CustomTuningSpec {
     ) -> Self {
         let sub_scale = (sub_bass_weight as f64).clamp(0.0, 2.0);
         let vocal_scale = (vocal_presence as f64).clamp(0.0, 2.0);
-        let mid_bass_gain = if anc_anti_mud { -6.5 } else { -2.0 };
+        let mid_bass_gain = if anc_anti_mud { -7.0 } else { -2.0 };
 
         let stages = [
             // Stage 0: HPF 24Hz Sub-Rumble Strip
@@ -283,13 +283,13 @@ impl CustomTuningSpec {
                 q: 0.7071,
                 gain_db: 0.0,
             },
-            // Stage 1: Low-Shelf 55Hz Sub-Bass Slam
+            // Stage 1: Low-Shelf 55Hz Sub-Bass Slam (Visceral punch)
             ParametricStage {
                 enabled: true,
                 filter_type: FilterType::LowShelf,
                 freq: 55.0,
                 q: 0.71,
-                gain_db: 5.5 * sub_scale,
+                gain_db: 6.0 * sub_scale,
             },
             // Stage 2: Peaking 145Hz (50dB ANC Anti-Mud & Resonance Notch)
             ParametricStage {
@@ -305,7 +305,7 @@ impl CustomTuningSpec {
                 filter_type: FilterType::Peaking,
                 freq: 320.0,
                 q: 1.2,
-                gain_db: -2.5,
+                gain_db: -3.0,
             },
             // Stage 4: Peaking 1650Hz Core Vocal Forwardness
             ParametricStage {
@@ -313,7 +313,7 @@ impl CustomTuningSpec {
                 filter_type: FilterType::Peaking,
                 freq: 1650.0,
                 q: 1.4,
-                gain_db: 3.5 * vocal_scale,
+                gain_db: 4.0 * vocal_scale,
             },
             // Stage 5: Peaking 3100Hz Pinna Ear-Gain (Intimacy & Clarity)
             ParametricStage {
@@ -321,7 +321,7 @@ impl CustomTuningSpec {
                 filter_type: FilterType::Peaking,
                 freq: 3100.0,
                 q: 1.8,
-                gain_db: 4.2 * vocal_scale,
+                gain_db: 4.8 * vocal_scale,
             },
             // Stage 6: Peaking 6600Hz AAC Treble De-Sizzle Notch
             ParametricStage {
@@ -329,7 +329,7 @@ impl CustomTuningSpec {
                 filter_type: FilterType::Peaking,
                 freq: 6600.0,
                 q: 2.5,
-                gain_db: -4.0,
+                gain_db: -4.5,
             },
             // Stage 7: High-Shelf 11500Hz Top-Octave Air & Soundstage
             ParametricStage {
@@ -337,7 +337,7 @@ impl CustomTuningSpec {
                 filter_type: FilterType::HighShelf,
                 freq: 11500.0,
                 q: 0.71,
-                gain_db: 3.5,
+                gain_db: 4.0,
             },
         ];
 
