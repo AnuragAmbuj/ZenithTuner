@@ -159,7 +159,7 @@ fun ZenithTunerScreen(
             // 120Hz Bode Plot Card (Always visible across all tabs for real-time acoustic feedback)
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                cornerRadius = 20.dp,
+                cornerRadius = 24.dp,
                 borderGlow = state.isDspEnabled
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -193,48 +193,26 @@ fun ZenithTunerScreen(
                 }
             }
 
-            // Material 3 Primary Tab Row
-            PrimaryTabRow(
-                selectedTabIndex = state.currentTab.ordinal,
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                contentColor = MaterialTheme.colorScheme.primary,
-                indicator = {
-                    TabRowDefaults.PrimaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(state.currentTab.ordinal),
-                        color = MaterialTheme.colorScheme.primary,
-                        height = 3.dp
-                    )
-                },
-                divider = {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                },
-                modifier = Modifier.clip(RoundedCornerShape(12.dp))
-            ) {
-                val haptic = LocalHapticFeedback.current
-                TunerTab.values().forEach { tab ->
-                    val isSelected = tab == state.currentTab
-                    Tab(
-                        selected = isSelected,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onTabSelect(tab)
-                        },
-                        text = {
-                            Text(
-                                text = tab.title,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        selectedContentColor = MaterialTheme.colorScheme.primary,
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            // Material 3 Expressive One-Tap Streaming Audio Bridge Card
+            ExpressiveAudioHookCard(
+                activeSessions = state.activeSessionCount
+            )
+
+            // Material 3 Expressive Floating Segmented Pill Tab Bar
+            ExpressiveSegmentedNavBar(
+                selectedTab = state.currentTab,
+                onTabSelect = onTabSelect
+            )
 
             // Content per selected tab
             when (state.currentTab) {
                 TunerTab.EXPRESS -> {
+                    // Material 3 Expressive Master Engine A/B Blind-Test Card
+                    ExpressiveAbCompareCard(
+                        state = state,
+                        onToggleDsp = onToggleDsp
+                    )
+
                     // Quick Preset Chips
                     PresetPillsRow(
                         activePreset = state.activePreset,
@@ -249,12 +227,6 @@ fun ZenithTunerScreen(
                         onVolumeChange = onVolumeChange,
                         onToggleMute = onToggleMute,
                         onDigitalGainChange = onDigitalGainChange
-                    )
-
-                    // Master Engine Switch
-                    MasterEngineCard(
-                        state = state,
-                        onToggle = onToggleDsp
                     )
 
                     // 6-Mic 50dB Hybrid ANC Decoupler & Phone Room Sensing Card

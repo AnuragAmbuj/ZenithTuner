@@ -265,40 +265,68 @@ fun SubBassWeightCard(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    val gainDb = 4.5f * weight
+    val gainDb = 6.0f * weight
 
-    GlassCard(modifier = modifier) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+    GlassCard(
+        modifier = modifier,
+        cornerRadius = 22.dp
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.GraphicEq,
-                        contentDescription = null,
-                        tint = ElectricCyan,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Sub-Bass Punch (55Hz)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "Sub-Bass Slam (55Hz)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "11mm Titanium Diaphragm Headroom",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
-                Text(
-                    text = String.format("%+.1f dB", gainDb),
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = ElectricCyan,
-                    fontSize = 14.sp
-                )
+                Surface(
+                    shape = RoundedCornerShape(percent = 50),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        text = String.format("%+.1f dB", gainDb),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontSize = 13.sp
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
             Slider(
                 value = weight,
                 onValueChange = {
@@ -309,19 +337,20 @@ fun SubBassWeightCard(
                 },
                 valueRange = 0.0f..2.0f,
                 colors = SliderDefaults.colors(
-                    thumbColor = ElectricCyan,
-                    activeTrackColor = ElectricCyan,
-                    inactiveTrackColor = ObsidianBorder
-                )
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                ),
+                modifier = Modifier.fillMaxWidth()
             )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Linear (0dB)", style = MaterialTheme.typography.labelSmall)
-                Text("Nominal (+4.5dB)", style = MaterialTheme.typography.labelSmall)
-                Text("Deep Slam (+9.0dB)", style = MaterialTheme.typography.labelSmall)
+                Text("Flat (0dB)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                Text("Improved (+6.0dB)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("Max Slam (+12.0dB)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
             }
         }
     }
@@ -337,41 +366,69 @@ fun VocalPresenceCard(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    val gain1650 = 3.2f * presence
-    val gain3100 = 3.8f * presence
+    val gain1650 = 4.0f * presence
+    val gain3100 = 4.8f * presence
 
-    GlassCard(modifier = modifier) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+    GlassCard(
+        modifier = modifier,
+        cornerRadius = 22.dp
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.RecordVoiceOver,
-                        contentDescription = null,
-                        tint = ElectricAzure,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Vocal Pinna Gain (1.65k & 3.1k)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.RecordVoiceOver,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "Vocal Pinna Gain",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "1.65kHz Body & 3.1kHz Intimacy",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
-                Text(
-                    text = String.format("%+.1f / %+.1f dB", gain1650, gain3100),
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = ElectricAzure,
-                    fontSize = 13.sp
-                )
+                Surface(
+                    shape = RoundedCornerShape(percent = 50),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Text(
+                        text = String.format("%+.1f / %+.1f dB", gain1650, gain3100),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
             Slider(
                 value = presence,
                 onValueChange = {
@@ -382,19 +439,20 @@ fun VocalPresenceCard(
                 },
                 valueRange = 0.0f..2.0f,
                 colors = SliderDefaults.colors(
-                    thumbColor = ElectricAzure,
-                    activeTrackColor = ElectricAzure,
-                    inactiveTrackColor = ObsidianBorder
-                )
+                    thumbColor = MaterialTheme.colorScheme.secondary,
+                    activeTrackColor = MaterialTheme.colorScheme.secondary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                ),
+                modifier = Modifier.fillMaxWidth()
             )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Recessed (0dB)", style = MaterialTheme.typography.labelSmall)
-                Text("Forward (Nominal)", style = MaterialTheme.typography.labelSmall)
-                Text("Intimate (+7.0dB)", style = MaterialTheme.typography.labelSmall)
+                Text("Recessed (0dB)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                Text("Forward (Improved)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                Text("Intimate (+9.6dB)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
             }
         }
     }
@@ -409,55 +467,86 @@ fun CrossfeedCard(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    GlassCard(modifier = modifier) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+    GlassCard(
+        modifier = modifier,
+        cornerRadius = 22.dp
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.SpatialAudio,
-                        contentDescription = null,
-                        tint = ElectricCyan,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Binaural Crossfeed & Soundstage",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.SpatialAudio,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "Binaural Crossfeed",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Natural Speaker Soundstage Imaging",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
-                Text(
-                    text = if (amount <= 0.01f) "Off" else String.format("%.0f%%", amount * 100f),
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = if (amount > 0.01f) ElectricCyan else TextTertiary,
-                    fontSize = 13.sp
-                )
+                Surface(
+                    shape = RoundedCornerShape(percent = 50),
+                    color = MaterialTheme.colorScheme.tertiaryContainer
+                ) {
+                    Text(
+                        text = if (amount <= 0.01f) "Off" else String.format("%.0f%%", amount * 100f),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
             Slider(
                 value = amount,
                 onValueChange = onValueChange,
                 valueRange = 0.0f..1.0f,
                 colors = SliderDefaults.colors(
-                    thumbColor = ElectricCyan,
-                    activeTrackColor = ElectricCyan,
-                    inactiveTrackColor = ObsidianBorder
-                )
+                    thumbColor = MaterialTheme.colorScheme.tertiary,
+                    activeTrackColor = MaterialTheme.colorScheme.tertiary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                ),
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Text(
-                text = "Simulates natural interaural time and acoustic head shadow, eliminating 'in-the-head' fatigue and widening spatial depth.",
-                style = MaterialTheme.typography.bodyMedium,
-                fontSize = 11.sp,
-                color = TextTertiary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Standard Stereo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                Text("Subtle Blend", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                Text("Max Speaker Simulation", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+            }
         }
     }
 }
