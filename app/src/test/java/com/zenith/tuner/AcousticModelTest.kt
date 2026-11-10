@@ -2,6 +2,7 @@ package com.zenith.tuner
 
 import com.zenith.tuner.anc.AncOptimizationMode
 import com.zenith.tuner.dsp.AcousticState
+import com.zenith.tuner.dsp.DynamicsProcessingManager
 import com.zenith.tuner.dsp.ZenithNativeDsp
 import org.junit.Assert.*
 import org.junit.Test
@@ -56,5 +57,30 @@ class AcousticModelTest {
         for (i in 0 until 32) {
             assertEquals("Post-EQ gain at band $i must be 0.0dB flat", 0.0f, outBuffer[96 + i], 0.001f)
         }
+    }
+
+    @Test
+    fun testGlobalSession0YieldsWhenSpecificSessionIsActive() {
+        assertTrue(
+            "Global session 0 should enable when engine is on and only session 0 exists",
+            DynamicsProcessingManager.shouldEnableGlobalSession(true, listOf(0))
+        )
+        assertFalse(
+            "Global session 0 must disable when a dedicated app session (>0) is attached",
+            DynamicsProcessingManager.shouldEnableGlobalSession(true, listOf(0, 3873))
+        )
+        assertFalse(
+            "Global session 0 must stay disabled when master DSP engine is bypassed",
+            DynamicsProcessingManager.shouldEnableGlobalSession(false, listOf(0))
+        )
+    }
+
+    @Test
+    fun testSpecificSessionCountExcludesGlobalSession0() {
+        assertEquals(0, AcousticState().activeSessionCount)
+        assertEquals(0, DynamicsProcessingManager.countSpecificSessions(emptyList()))
+        assertEquals(0, DynamicsProcessingManager.countSpecificSessions(listOf(0)))
+        assertEquals(1, DynamicsProcessingManager.countSpecificSessions(listOf(0, 3873)))
+        assertEquals(2, DynamicsProcessingManager.countSpecificSessions(listOf(0, 3873, 4102)))
     }
 }

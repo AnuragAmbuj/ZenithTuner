@@ -311,11 +311,13 @@ class ZenithDspService : LifecycleService() {
     fun onAudioSessionOpened(sessionId: Int) {
         dynamicsManager.attachSession(sessionId)
         updateState()
+        updateNotification()
     }
 
     fun onAudioSessionClosed(sessionId: Int) {
         dynamicsManager.detachSession(sessionId)
         updateState()
+        updateNotification()
     }
 
     private fun updateState() {
@@ -357,10 +359,15 @@ class ZenithDspService : LifecycleService() {
 
         val dspStatus = if (state.isDspEnabled) "ACTIVE" else "BYPASS"
         val presetName = state.activePreset.displayName
+        val sessionText = if (state.activeSessionCount > 0) {
+            "${state.activeSessionCount} App${if (state.activeSessionCount == 1) "" else "s"} Hooked"
+        } else {
+            "Global (0) Fallback"
+        }
 
         return NotificationCompat.Builder(this, ZenithApplication.CHANNEL_ID)
             .setContentTitle("ZenithTuner: $presetName ($dspStatus)")
-            .setContentText("Preamp: ${String.format("%.1f", state.preampHeadroomDb)}dB • Sessions: ${state.activeSessionCount}")
+            .setContentText("Preamp: ${String.format("%.1f", state.preampHeadroomDb)}dB • $sessionText")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .setContentIntent(openAppIntent)

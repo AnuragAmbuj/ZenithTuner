@@ -256,7 +256,12 @@ fun ExpressiveAbCompareCard(
                 AcousticPill(label = "55Hz Sub", value = if (isEngaged) "+6.0dB" else "0.0dB")
                 AcousticPill(label = "145Hz Mud", value = if (isEngaged) "-7.0dB" else "0.0dB")
                 AcousticPill(label = "3.1k Pinna", value = if (isEngaged) "+4.8dB" else "0.0dB")
-                AcousticPill(label = "Sessions", value = "${state.activeSessionCount}")
+                val sessionPillValue = when (state.activeSessionCount) {
+                    0 -> "0 (Mix)"
+                    1 -> "1 App"
+                    else -> "${state.activeSessionCount} Apps"
+                }
+                AcousticPill(label = "Sessions", value = sessionPillValue)
             }
         }
     }
@@ -439,12 +444,16 @@ fun ExpressiveAudioHookCard(
 
                 Column {
                     Text(
-                        text = "Hook Streaming Audio",
+                        text = if (activeSessions > 0) "Streaming Audio Hooked" else "Hook Streaming Audio",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Connect YouTube Music / Spotify session",
+                        text = if (activeSessions > 0) {
+                            "Attached to $activeSessions dedicated app stream${if (activeSessions == 1) "" else "s"}"
+                        } else {
+                            "Global Mix (0) fallback • Tap Bridge for YT Music / Spotify"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

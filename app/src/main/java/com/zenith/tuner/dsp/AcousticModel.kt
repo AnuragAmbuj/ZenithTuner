@@ -101,7 +101,7 @@ data class AcousticState(
     val stages: List<ParametricStageConfig> = defaultStages(),
 
     // System Status
-    val activeSessionCount: Int = 1,
+    val activeSessionCount: Int = 0,
     val isNativeLoaded: Boolean = false,
 
     // Output Curves & Hardware Buffers

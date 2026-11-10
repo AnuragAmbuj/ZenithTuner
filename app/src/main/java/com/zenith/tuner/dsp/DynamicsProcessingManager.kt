@@ -28,6 +28,19 @@ class DynamicsProcessingManager {
         const val PRE_EQ_BANDS = 32
         const val POST_EQ_BANDS = 32
         const val MBC_BANDS = 4
+
+        /**
+         * Global session 0 is enabled strictly as a fallback when the engine is on and no
+         * dedicated per-app session (sessionId > 0) is active, preventing serial double-EQ.
+         */
+        internal fun shouldEnableGlobalSession(
+            isEngineEnabled: Boolean,
+            sessionIds: Collection<Int>
+        ): Boolean = isEngineEnabled && sessionIds.none { it > 0 }
+
+        /** Counts dedicated app audio sessions (sessionId > 0), excluding the global 0 fallback. */
+        internal fun countSpecificSessions(sessionIds: Collection<Int>): Int =
+            sessionIds.count { it > 0 }
     }
 
     private val activeEffects = ConcurrentHashMap<Int, DynamicsProcessing>()
@@ -97,6 +110,20 @@ class DynamicsProcessingManager {
         hardwareUpdateChannel.trySend(Unit)
     }
 
+    /** Reconciles global session 0 enabled state under monitor lock; catches Binder/AudioFlinger errors. */
+    private fun syncGlobalFallbackLocked() {
+        val globalDp = activeEffects[GLOBAL_AUDIO_SESSION_ID] ?: return
+        val targetEnabled = shouldEnableGlobalSession(isEngineEnabled, activeEffects.keys)
+        try {
+            if (globalDp.enabled != targetEnabled) {
+                val res = globalDp.setEnabled(targetEnabled)
+                Log.i(TAG, "Global session 0 fallback setEnabled($targetEnabled) returned $res")
+            }
+        } catch (e: Throwable) {
+            Log.e(TAG, "Error syncing global session 0 fallback state to $targetEnabled", e)
+        }
+    }
+
     @Synchronized
     fun attachSession(sessionId: Int): Boolean {
         if (activeEffects.containsKey(sessionId)) {
@@ -107,9 +134,8 @@ class DynamicsProcessingManager {
         try {
             val config = buildDynamicsProcessingConfig()
             val dp = DynamicsProcessing(PRIORITY_MASTER, sessionId, config)
-            val hasSpecificSessions = activeEffects.keys.any { it > 0 } || sessionId > 0
             val shouldEnable = if (sessionId == GLOBAL_AUDIO_SESSION_ID) {
-                isEngineEnabled && !hasSpecificSessions
+                shouldEnableGlobalSession(isEngineEnabled, activeEffects.keys)
             } else {
                 isEngineEnabled
             }
@@ -118,14 +144,9 @@ class DynamicsProcessingManager {
             val hasCtrl = dp.hasControl()
             activeEffects[sessionId] = dp
 
-            // When attaching a specific session, immediately bypass global session 0 to prevent double-EQ!
+            // When attaching a specific session, immediately bypass global session 0 to prevent double-EQ.
             if (sessionId > 0) {
-                activeEffects[GLOBAL_AUDIO_SESSION_ID]?.let { globalDp ->
-                    if (globalDp.enabled) {
-                        globalDp.enabled = false
-                        Log.i(TAG, "Bypassed global session 0 to eliminate serial double-EQ with session $sessionId")
-                    }
-                }
+                syncGlobalFallbackLocked()
             }
 
             Log.i(
@@ -143,7 +164,7 @@ class DynamicsProcessingManager {
     fun detachSession(sessionId: Int) {
         activeEffects.remove(sessionId)?.let { dp ->
             try {
-                dp.enabled = false
+                dp.setEnabled(false)
                 dp.release()
                 Log.i(TAG, "Released DynamicsProcessing for session $sessionId")
             } catch (e: Throwable) {
@@ -151,14 +172,9 @@ class DynamicsProcessingManager {
             }
         }
 
-        // If no more specific player sessions are active, restore global session 0 as fallback
-        if (activeEffects.keys.none { it > 0 }) {
-            activeEffects[GLOBAL_AUDIO_SESSION_ID]?.let { globalDp ->
-                if (isEngineEnabled && !globalDp.enabled) {
-                    globalDp.enabled = true
-                    Log.i(TAG, "Re-enabled global session 0 as fallback listener")
-                }
-            }
+        // Restore global session 0 fallback only if no dedicated app sessions remain active.
+        if (sessionId > 0) {
+            syncGlobalFallbackLocked()
         }
     }
 
@@ -166,7 +182,7 @@ class DynamicsProcessingManager {
     fun releaseAll() {
         activeEffects.forEach { (sessionId, dp) ->
             try {
-                dp.enabled = false
+                dp.setEnabled(false)
                 dp.release()
             } catch (e: Throwable) {
                 Log.e(TAG, "Error releasing session $sessionId", e)
@@ -179,14 +195,10 @@ class DynamicsProcessingManager {
     @Synchronized
     fun setEnabled(enabled: Boolean) {
         isEngineEnabled = enabled
-        val hasSpecificSessions = activeEffects.keys.any { it > 0 }
+        val globalTarget = shouldEnableGlobalSession(enabled, activeEffects.keys)
         activeEffects.forEach { (session, dp) ->
             try {
-                val shouldEnable = if (session == GLOBAL_AUDIO_SESSION_ID) {
-                    enabled && !hasSpecificSessions
-                } else {
-                    enabled
-                }
+                val shouldEnable = if (session == GLOBAL_AUDIO_SESSION_ID) globalTarget else enabled
                 val res = dp.setEnabled(shouldEnable)
                 Log.i(TAG, "Session $session setEnabled($shouldEnable) returned $res, enabled=${dp.enabled}")
             } catch (e: Throwable) {
@@ -412,7 +424,7 @@ class DynamicsProcessingManager {
                 digitalOutputGainDb = digitalOutputGainDb,
                 mbcSettings = mbcSettings,
                 stages = stages.toList(),
-                activeSessionCount = activeEffects.size.coerceAtLeast(1),
+                activeSessionCount = countSpecificSessions(activeEffects.keys),
                 isNativeLoaded = ZenithNativeDsp.isNativeLoaded,
                 curveGains = curve,
                 preEqFreqs = preFreqs,
