@@ -235,6 +235,7 @@ data class AcousticState(
         if (activePreset != other.activePreset) return false
         if (currentTab != other.currentTab) return false
         if (ancAntiMudEnabled != other.ancAntiMudEnabled) return false
+        if (ancOptimizationMode != other.ancOptimizationMode) return false
         if (subBassWeight != other.subBassWeight) return false
         if (vocalPresence != other.vocalPresence) return false
         if (crossfeedAmount != other.crossfeedAmount) return false
@@ -242,11 +243,17 @@ data class AcousticState(
         if (manualPreampDb != other.manualPreampDb) return false
         if (preampHeadroomDb != other.preampHeadroomDb) return false
         if (maxBoostDb != other.maxBoostDb) return false
+        if (volumeRatio != other.volumeRatio) return false
+        if (digitalOutputGainDb != other.digitalOutputGainDb) return false
         if (mbcSettings != other.mbcSettings) return false
         if (stages != other.stages) return false
         if (activeSessionCount != other.activeSessionCount) return false
         if (isNativeLoaded != other.isNativeLoaded) return false
         if (!curveGains.contentEquals(other.curveGains)) return false
+        if (!preEqFreqs.contentEquals(other.preEqFreqs)) return false
+        if (!preEqGains.contentEquals(other.preEqGains)) return false
+        if (!postEqFreqs.contentEquals(other.postEqFreqs)) return false
+        if (!postEqGains.contentEquals(other.postEqGains)) return false
         return true
     }
 
@@ -255,6 +262,7 @@ data class AcousticState(
         result = 31 * result + activePreset.hashCode()
         result = 31 * result + currentTab.hashCode()
         result = 31 * result + ancAntiMudEnabled.hashCode()
+        result = 31 * result + ancOptimizationMode.hashCode()
         result = 31 * result + subBassWeight.hashCode()
         result = 31 * result + vocalPresence.hashCode()
         result = 31 * result + crossfeedAmount.hashCode()
@@ -262,11 +270,17 @@ data class AcousticState(
         result = 31 * result + manualPreampDb.hashCode()
         result = 31 * result + preampHeadroomDb.hashCode()
         result = 31 * result + maxBoostDb.hashCode()
+        result = 31 * result + volumeRatio.hashCode()
+        result = 31 * result + digitalOutputGainDb.hashCode()
         result = 31 * result + mbcSettings.hashCode()
         result = 31 * result + stages.hashCode()
         result = 31 * result + activeSessionCount
         result = 31 * result + isNativeLoaded.hashCode()
         result = 31 * result + curveGains.contentHashCode()
+        result = 31 * result + preEqFreqs.contentHashCode()
+        result = 31 * result + preEqGains.contentHashCode()
+        result = 31 * result + postEqFreqs.contentHashCode()
+        result = 31 * result + postEqGains.contentHashCode()
         return result
     }
 }

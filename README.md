@@ -162,7 +162,7 @@ The boAt Nirvana Zenith uses 6 microphones (2 Feedforward, 2 Feedback, 2 Talk EN
 
 * **120Hz Zero-Recomposition Bode Plot**: Built using Compose's `Modifier.drawWithCache`. You can drag your finger across the frequency response curve to inspect exact frequency and decibel gain in real-time at 120Hz without triggering Compose recomposition passes.
 * **Full Material Design 3 (Light & Dark)**: Native M3 tonal palettes with dynamic top-bar theme toggling (`Dark`, `Light`, `System`) and contrast-safe status/navigation bar insets.
-* **Binaural Spatial Crossfeed**: Natural interaural time and frequency delay simulation (0%–100%) that eliminates the in-the-head listening fatigue typical of closed-back in-ear monitors.
+* **Bauer Acoustic Head-Shadow Compensation**: Implements Bauer/Chu acoustic head-shadow equalization (0%–100%) across the frequency response curve to counteract in-ear isolation and reduce acoustic listening fatigue.
 * **Media Volume & Preamp Card**: Hardware volume rocker integration with smooth digital gain compensation.
 
 ### Recommended Earbud Setup

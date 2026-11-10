@@ -32,6 +32,7 @@ class DynamicsProcessingManager {
 
     private val activeEffects = ConcurrentHashMap<Int, DynamicsProcessing>()
     private val buffer = FloatArray(ZenithNativeDsp.BUFFER_SIZE)
+    private val computationLock = Any()
 
     // Background dispatcher for AudioFlinger IPC to keep Compose UI at buttery 120Hz
     private val dspScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -106,13 +107,30 @@ class DynamicsProcessingManager {
         try {
             val config = buildDynamicsProcessingConfig()
             val dp = DynamicsProcessing(PRIORITY_MASTER, sessionId, config)
-            val setResult = dp.setEnabled(isEngineEnabled)
+            val hasSpecificSessions = activeEffects.keys.any { it > 0 } || sessionId > 0
+            val shouldEnable = if (sessionId == GLOBAL_AUDIO_SESSION_ID) {
+                isEngineEnabled && !hasSpecificSessions
+            } else {
+                isEngineEnabled
+            }
+            val setResult = dp.setEnabled(shouldEnable)
             val actualEnabled = dp.enabled
             val hasCtrl = dp.hasControl()
             activeEffects[sessionId] = dp
+
+            // When attaching a specific session, immediately bypass global session 0 to prevent double-EQ!
+            if (sessionId > 0) {
+                activeEffects[GLOBAL_AUDIO_SESSION_ID]?.let { globalDp ->
+                    if (globalDp.enabled) {
+                        globalDp.enabled = false
+                        Log.i(TAG, "Bypassed global session 0 to eliminate serial double-EQ with session $sessionId")
+                    }
+                }
+            }
+
             Log.i(
                 TAG,
-                "Attached DynamicsProcessing to session $sessionId: setResult=$setResult, enabled=$actualEnabled, hasControl=$hasCtrl (Target=$isEngineEnabled)"
+                "Attached DynamicsProcessing to session $sessionId: setResult=$setResult, enabled=$actualEnabled, hasControl=$hasCtrl (Target=$shouldEnable)"
             )
             return true
         } catch (e: Throwable) {
@@ -130,6 +148,16 @@ class DynamicsProcessingManager {
                 Log.i(TAG, "Released DynamicsProcessing for session $sessionId")
             } catch (e: Throwable) {
                 Log.e(TAG, "Error releasing session $sessionId", e)
+            }
+        }
+
+        // If no more specific player sessions are active, restore global session 0 as fallback
+        if (activeEffects.keys.none { it > 0 }) {
+            activeEffects[GLOBAL_AUDIO_SESSION_ID]?.let { globalDp ->
+                if (isEngineEnabled && !globalDp.enabled) {
+                    globalDp.enabled = true
+                    Log.i(TAG, "Re-enabled global session 0 as fallback listener")
+                }
             }
         }
     }
@@ -151,10 +179,16 @@ class DynamicsProcessingManager {
     @Synchronized
     fun setEnabled(enabled: Boolean) {
         isEngineEnabled = enabled
+        val hasSpecificSessions = activeEffects.keys.any { it > 0 }
         activeEffects.forEach { (session, dp) ->
             try {
-                val res = dp.setEnabled(enabled)
-                Log.i(TAG, "Session $session setEnabled($enabled) returned $res, enabled=${dp.enabled}")
+                val shouldEnable = if (session == GLOBAL_AUDIO_SESSION_ID) {
+                    enabled && !hasSpecificSessions
+                } else {
+                    enabled
+                }
+                val res = dp.setEnabled(shouldEnable)
+                Log.i(TAG, "Session $session setEnabled($shouldEnable) returned $res, enabled=${dp.enabled}")
             } catch (e: Throwable) {
                 Log.e(TAG, "Failed to toggle enabled state for session $session", e)
             }
@@ -352,60 +386,71 @@ class DynamicsProcessingManager {
         return getCurrentState()
     }
 
+    @Synchronized
     fun getCurrentState(): AcousticState {
-        val preFreqs = FloatArray(32) { buffer[it] }
-        val preGains = FloatArray(32) { buffer[32 + it] }
-        val postFreqs = FloatArray(32) { buffer[64 + it] }
-        val postGains = FloatArray(32) { buffer[96 + it] }
-        val curve = FloatArray(64) { buffer[ZenithNativeDsp.INDEX_CURVE_START + it] }
+        synchronized(computationLock) {
+            val preFreqs = FloatArray(32) { buffer[it] }
+            val preGains = FloatArray(32) { buffer[32 + it] }
+            val postFreqs = FloatArray(32) { buffer[64 + it] }
+            val postGains = FloatArray(32) { buffer[96 + it] }
+            val curve = FloatArray(64) { buffer[ZenithNativeDsp.INDEX_CURVE_START + it] }
 
-        return AcousticState(
-            isDspEnabled = isEngineEnabled,
-            activePreset = activePreset,
-            currentTab = currentTab,
-            ancAntiMudEnabled = ancAntiMud,
-            ancOptimizationMode = ancOptimizationMode,
-            subBassWeight = subBassWeight,
-            vocalPresence = vocalPresence,
-            crossfeedAmount = crossfeedAmount,
-            autoPreampEnabled = autoPreampEnabled,
-            manualPreampDb = manualPreampDb,
-            preampHeadroomDb = buffer[ZenithNativeDsp.INDEX_PREAMP],
-            maxBoostDb = buffer[ZenithNativeDsp.INDEX_MAX_BOOST],
-            volumeRatio = volumeRatio,
-            digitalOutputGainDb = digitalOutputGainDb,
-            mbcSettings = mbcSettings,
-            stages = stages.toList(),
-            activeSessionCount = activeEffects.size.coerceAtLeast(1),
-            isNativeLoaded = ZenithNativeDsp.isNativeLoaded,
-            curveGains = curve,
-            preEqFreqs = preFreqs,
-            preEqGains = preGains,
-            postEqFreqs = postFreqs,
-            postEqGains = postGains
-        )
+            return AcousticState(
+                isDspEnabled = isEngineEnabled,
+                activePreset = activePreset,
+                currentTab = currentTab,
+                ancAntiMudEnabled = ancAntiMud,
+                ancOptimizationMode = ancOptimizationMode,
+                subBassWeight = subBassWeight,
+                vocalPresence = vocalPresence,
+                crossfeedAmount = crossfeedAmount,
+                autoPreampEnabled = autoPreampEnabled,
+                manualPreampDb = manualPreampDb,
+                preampHeadroomDb = buffer[ZenithNativeDsp.INDEX_PREAMP],
+                maxBoostDb = buffer[ZenithNativeDsp.INDEX_MAX_BOOST],
+                volumeRatio = volumeRatio,
+                digitalOutputGainDb = digitalOutputGainDb,
+                mbcSettings = mbcSettings,
+                stages = stages.toList(),
+                activeSessionCount = activeEffects.size.coerceAtLeast(1),
+                isNativeLoaded = ZenithNativeDsp.isNativeLoaded,
+                curveGains = curve,
+                preEqFreqs = preFreqs,
+                preEqGains = preGains,
+                postEqFreqs = postFreqs,
+                postEqGains = postGains
+            )
+        }
     }
 
     private fun recomputeParameters() {
         val manualPreamp = if (!autoPreampEnabled) manualPreampDb else null
-        ZenithNativeDsp.computeCustom(
-            sampleRate = 48000.0,
-            stages = stages,
-            crossfeed = crossfeedAmount,
-            manualPreampDb = manualPreamp,
-            outBuffer = buffer
-        )
+        synchronized(computationLock) {
+            ZenithNativeDsp.computeCustom(
+                sampleRate = 48000.0,
+                stages = stages,
+                crossfeed = crossfeedAmount,
+                manualPreampDb = manualPreamp,
+                outBuffer = buffer
+            )
+        }
     }
 
     private fun applyToActiveEffectsInternal() {
-        val effectiveGain = buffer[ZenithNativeDsp.INDEX_PREAMP] + digitalOutputGainDb
+        val effectiveGain: Float
+        val preBands = ArrayList<Pair<Float, Float>>(PRE_EQ_BANDS)
+        synchronized(computationLock) {
+            effectiveGain = buffer[ZenithNativeDsp.INDEX_PREAMP] + digitalOutputGainDb
+            for (b in 0 until PRE_EQ_BANDS) {
+                preBands.add(buffer[b] to buffer[32 + b])
+            }
+        }
 
         activeEffects.values.forEach { dp ->
             try {
                 dp.setInputGainAllChannelsTo(effectiveGain)
                 for (b in 0 until PRE_EQ_BANDS) {
-                    val f = buffer[b]
-                    val g = buffer[32 + b]
+                    val (f, g) = preBands[b]
                     dp.setPreEqBandAllChannelsTo(b, DynamicsProcessing.EqBand(true, f, g))
                 }
             } catch (e: Throwable) {

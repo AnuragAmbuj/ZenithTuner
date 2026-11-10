@@ -59,19 +59,42 @@ class ZenithDspService : LifecycleService() {
     private val dynamicsManager = DynamicsProcessingManager()
 
     private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    private val playbackDiscoveredSessions = java.util.Collections.synchronizedSet(mutableSetOf<Int>())
 
     private val playbackCallback = object : AudioManager.AudioPlaybackCallback() {
         override fun onPlaybackConfigChanged(configs: List<AudioPlaybackConfiguration>) {
-            var sessionCountChanged = false
+            val currentActiveSessions = mutableSetOf<Int>()
             for (config in configs) {
                 val sessionId = extractSessionId(config)
                 if (sessionId > 0) {
+                    currentActiveSessions.add(sessionId)
+                }
+            }
+
+            var sessionChanged = false
+
+            // 1. Detach vanished sessions that ended playback
+            val deadSessions = synchronized(playbackDiscoveredSessions) {
+                playbackDiscoveredSessions.filter { it !in currentActiveSessions }
+            }
+            for (deadId in deadSessions) {
+                dynamicsManager.detachSession(deadId)
+                playbackDiscoveredSessions.remove(deadId)
+                sessionChanged = true
+                Log.i(TAG, "Detached finished playback session $deadId")
+            }
+
+            // 2. Attach newly active playback sessions
+            for (sessionId in currentActiveSessions) {
+                if (playbackDiscoveredSessions.add(sessionId)) {
                     if (dynamicsManager.attachSession(sessionId)) {
-                        sessionCountChanged = true
+                        sessionChanged = true
+                        Log.i(TAG, "Attached to newly active playback session $sessionId")
                     }
                 }
             }
-            if (sessionCountChanged) {
+
+            if (sessionChanged) {
                 updateState()
                 updateNotification()
             }
@@ -124,9 +147,11 @@ class ZenithDspService : LifecycleService() {
             for (config in activeConfigs) {
                 val sessionId = extractSessionId(config)
                 if (sessionId > 0) {
-                    if (dynamicsManager.attachSession(sessionId)) {
-                        changed = true
-                        Log.i(TAG, "Discovered and attached to active player audio session $sessionId")
+                    if (playbackDiscoveredSessions.add(sessionId)) {
+                        if (dynamicsManager.attachSession(sessionId)) {
+                            changed = true
+                            Log.i(TAG, "Discovered and attached to active player audio session $sessionId")
+                        }
                     }
                 }
             }
@@ -365,6 +390,7 @@ class ZenithDspService : LifecycleService() {
         } catch (e: Throwable) {
             Log.e(TAG, "Failed to unregister playback callback", e)
         }
+        playbackDiscoveredSessions.clear()
         dynamicsManager.releaseAll()
         instance = null
         Log.i(TAG, "ZenithDspService destroyed.")

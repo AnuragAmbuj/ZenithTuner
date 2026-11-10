@@ -155,13 +155,31 @@ object ZenithNativeDsp {
 
         val preampDb = manualPreampDb ?: (if (maxBoost > 0.0) -(maxBoost + 0.2).toFloat() else 0.0f)
 
+        // 32 Full-Spectrum logarithmically spaced bands (20Hz - 20,000Hz) matching the Rust core
         for (i in 0 until 32) {
-            out[i] = freqs[i]
-            out[32 + i] = curve[i]
+            val exp = i.toDouble() / 31.0
+            val f = 20.0 * (20000.0 / 20.0).pow(exp)
+            var totalDb = 0.0
+            for (filter in biquads) {
+                totalDb += evalDb(filter, f, sr)
+            }
+            if (crossfeed > 0.01f) {
+                if (f < 700.0) {
+                    totalDb += 0.75 * crossfeed * (1.0 - f / 700.0)
+                } else if (f > 6000.0) {
+                    totalDb += -0.6 * crossfeed * ((f - 6000.0) / 14000.0).coerceIn(0.0, 1.0)
+                }
+            }
+            out[i] = f.toFloat()
+            out[32 + i] = totalDb.toFloat()
         }
+
+        // Post-EQ: 32 flat unity-gain bands (0dB) to prevent serial destructive interference
         for (i in 0 until 32) {
-            out[64 + i] = freqs[32 + i]
-            out[96 + i] = curve[32 + i]
+            val exp = i.toDouble() / 31.0
+            val f = 20.0 * (20000.0 / 20.0).pow(exp)
+            out[64 + i] = f.toFloat()
+            out[96 + i] = 0.0f
         }
 
         out[INDEX_PREAMP] = preampDb

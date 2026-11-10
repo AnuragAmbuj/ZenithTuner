@@ -500,12 +500,12 @@ fun CrossfeedCard(
                     }
                     Column {
                         Text(
-                            text = "Binaural Crossfeed",
+                            text = "Acoustic Head-Shadow EQ",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Natural Speaker Soundstage Imaging",
+                            text = "Bauer Diffuse-Field Soundstage Curve",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
