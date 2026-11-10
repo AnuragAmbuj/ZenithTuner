@@ -10,6 +10,20 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- Android 11+ package visibility for documented OEM/ColorOS diagnostic checks -->
+    <queries>
+        <package android:name="com.oplus.battery" />
+        <package android:name="com.coloros.oppoguardelf" />
+        <package android:name="com.oplus.athena" />
+        <package android:name="com.oplus.audio.effectcenter" />
+        <package android:name="com.coloros.soundrecorder" />
+        <package android:name="com.oplus.sau" />
+        <intent>
+            <action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
+        </intent>
+    </queries>
 
     <application
         android:name=".ZenithApplication"

@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zenith.tuner.dsp.AcousticState
 import com.zenith.tuner.dsp.TunerTab
+import com.zenith.tuner.oem.ColorOsPatternDetector
+import com.zenith.tuner.oem.ColorOsPatternReport
 import com.zenith.tuner.ui.theme.*
 
 /**
@@ -512,6 +514,196 @@ private fun AcousticPill(label: String, value: String) {
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
+        }
+    }
+}
+
+/**
+ * Surfaces detected ColorOS / Realme UI / Oplus patterns (Session-0 stream isolation,
+ * OplusHansManager freeze risk, and OEM AudioFX modules) with one-tap mitigation.
+ */
+@Composable
+fun ColorOsPatternCard(
+    report: ColorOsPatternReport,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Memory,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = if (report.isColorOsDetected) "COLOROS AUDIO GUARD" else "OEM AUDIO DIAGNOSTICS",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(percent = 50),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        text = report.deviceSummary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (report.isColorOsDetected) {
+                PatternDiagnosticRow(
+                    icon = Icons.Default.Route,
+                    title = "Session-0 Isolation",
+                    detail = if (report.hasActiveAppSession) {
+                        "Dedicated player stream linked (Session 0 safely bypassed)"
+                    } else {
+                        "ColorOS skips Global Mix (0) — tap Bridge or player Equalizer"
+                    },
+                    isHealthy = report.hasActiveAppSession
+                )
+            }
+
+            PatternDiagnosticRow(
+                icon = Icons.Default.BatteryChargingFull,
+                title = if (report.isColorOsDetected) "OplusHans Background Guard" else "Background Battery Guard",
+                detail = if (report.isBatteryOptimizationIgnored) {
+                    "Unrestricted • Keeps DSP alive when screen locks"
+                } else {
+                    "Restricted • ColorOS freezes DSP on screen off"
+                },
+                isHealthy = report.isBatteryOptimizationIgnored,
+                actionLabel = if (report.needsBackgroundExemption) "Allow" else null,
+                onAction = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    ColorOsPatternDetector.openBatteryOptimizationSettings(context)
+                }
+            )
+
+            if (report.oemAudioFxImplementors.isNotEmpty()) {
+                PatternDiagnosticRow(
+                    icon = Icons.Default.WarningAmber,
+                    title = "OEM AudioFX Detected",
+                    detail = "${report.oemAudioFxImplementors.joinToString(", ")} — disable built-in Real Sound/Atmos",
+                    isHealthy = false
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PatternDiagnosticRow(
+    icon: ImageVector,
+    title: String,
+    detail: String,
+    isHealthy: Boolean,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    val badgeBg = if (isHealthy) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.tertiaryContainer
+    }
+    val badgeTint = if (isHealthy) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onTertiaryContainer
+    }
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = badgeBg,
+                modifier = Modifier.size(30.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = badgeTint,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (actionLabel != null && onAction != null) {
+                Button(
+                    onClick = onAction,
+                    shape = RoundedCornerShape(percent = 50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary,
+                        contentColor = MaterialTheme.colorScheme.onTertiary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Text(
+                        text = actionLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

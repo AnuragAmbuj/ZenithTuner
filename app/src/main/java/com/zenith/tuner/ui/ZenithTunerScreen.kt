@@ -15,15 +15,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.zenith.tuner.anc.AmbientNoiseReading
 import com.zenith.tuner.anc.AncOptimizationMode
 import com.zenith.tuner.dsp.*
+import com.zenith.tuner.oem.ColorOsPatternDetector
+import com.zenith.tuner.oem.ColorOsPatternReport
+import com.zenith.tuner.oem.OemAudioFamily
 import com.zenith.tuner.ui.components.*
 import com.zenith.tuner.ui.theme.*
 
@@ -54,6 +62,39 @@ fun ZenithTunerScreen(
 ) {
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val isInspection = LocalInspectionMode.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val latestSessionCount by rememberUpdatedState(state.activeSessionCount)
+
+    fun refreshOemReport(): ColorOsPatternReport {
+        return if (isInspection) {
+            ColorOsPatternReport(
+                oemFamily = OemAudioFamily.COLOR_OS_FAMILY,
+                deviceSummary = "realme Preview",
+                detectedOplusPackages = emptyList(),
+                oemAudioFxImplementors = emptyList(),
+                isBatteryOptimizationIgnored = false,
+                hasActiveAppSession = latestSessionCount > 0
+            )
+        } else {
+            ColorOsPatternDetector.inspect(context, latestSessionCount)
+        }
+    }
+
+    var oemReport by remember { mutableStateOf(refreshOemReport()) }
+    LaunchedEffect(state.activeSessionCount) {
+        oemReport = refreshOemReport()
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                oemReport = refreshOemReport()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -212,6 +253,13 @@ fun ZenithTunerScreen(
                         state = state,
                         onToggleDsp = onToggleDsp
                     )
+
+                    if (oemReport.isColorOsDetected ||
+                        oemReport.needsBackgroundExemption ||
+                        oemReport.oemAudioFxImplementors.isNotEmpty()
+                    ) {
+                        ColorOsPatternCard(report = oemReport)
+                    }
 
                     // Quick Preset Chips
                     PresetPillsRow(
